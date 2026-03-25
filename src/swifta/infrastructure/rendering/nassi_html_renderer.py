@@ -25,7 +25,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     def render(self, diagram: ControlFlowDiagram) -> str:
         sections = "".join(self._render_function(function) for function in diagram.functions)
         if not sections:
-            sections = '<section class="function-card"><p class="empty-file">No functions found.</p></section>'
+            sections = '<section class="function-panel"><p class="empty-file">No functions found.</p></section>'
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -35,250 +35,301 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     <title>Nassi-Shneiderman Control Flow</title>
     <style>
       :root {{
-        --line: #17344a;
-        --ink: #112233;
-        --muted: #6a5f53;
-        --canvas: #f4eee1;
-        --paper: #fffdf8;
-        --card: rgba(255, 255, 255, 0.9);
-        --soft: #efe3cf;
-        --soft-2: #fbf6ec;
-        --shadow: 0 18px 44px rgba(23, 52, 74, 0.12);
-        --action-bg: #ffffff;
-        --action-line: #baa98d;
-        --if-bg: #fff0d5;
-        --if-line: #d38717;
-        --loop-bg: #dff3fb;
-        --loop-line: #1f7898;
-        --switch-bg: #dff4ec;
-        --switch-line: #187a63;
-        --guard-bg: #fde3dd;
-        --guard-line: #c94e43;
-        --do-bg: #ece8df;
-        --do-line: #6d665a;
-        --defer-bg: #efe7d4;
-        --defer-line: #86693f;
+        --line: #20354d;
+        --line-soft: #58718f;
+        --page: #b5bec8;
+        --window: #ece7d7;
+        --panel: #f7f2e4;
+        --panel-2: #fffdf8;
+        --text: #0f1825;
+        --muted: #536273;
+        --shadow: 0 20px 46px rgba(19, 34, 52, 0.24);
+        --banner: #1778df;
+        --banner-dark: #0b58b0;
+        --banner-light: #dcecff;
+        --loop-fill: #edf5ff;
+        --switch-fill: #eef8f3;
+        --guard-fill: #fff1e7;
+        --do-fill: #efeff2;
+        --defer-fill: #f6efdf;
+        --yes-fill: #d8f1c9;
+        --no-fill: #ffd7dc;
+        --action-fill: #ffffff;
+        --note-fill: #eef3f8;
       }}
       * {{ box-sizing: border-box; }}
       body {{
         margin: 0;
-        padding: 32px;
-        font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-        color: var(--ink);
+        padding: 24px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        color: var(--text);
         background:
-          radial-gradient(circle at top left, #fff5dc 0, transparent 30%),
-          linear-gradient(180deg, #fffaf1 0%, var(--canvas) 100%);
+          radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 24%),
+          linear-gradient(180deg, #d8dfe6 0%, var(--page) 100%);
       }}
-      .page {{
+      .viewer {{
         max-width: 1180px;
         margin: 0 auto;
-      }}
-      .hero {{
-        margin-bottom: 28px;
-        padding: 24px 28px;
-        border: 3px solid var(--line);
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(250, 243, 229, 0.9));
+        border: 2px solid var(--line);
+        background: var(--window);
         box-shadow: var(--shadow);
       }}
-      .eyebrow {{
-        margin: 0 0 8px;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 12px;
+      .titlebar {{
+        padding: 8px 14px;
+        color: #ffffff;
+        font-size: 18px;
         font-weight: 700;
+        letter-spacing: 0.01em;
+        background: linear-gradient(180deg, #3394ff 0%, var(--banner) 48%, var(--banner-dark) 100%);
+        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
       }}
-      .hero h1 {{
-        margin: 0 0 8px;
-        font-size: 30px;
-        line-height: 1.05;
+      .toolbar {{
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        align-items: center;
+        padding: 8px 14px;
+        border-top: 1px solid rgba(255, 255, 255, 0.35);
+        border-bottom: 2px solid var(--line-soft);
+        background: linear-gradient(180deg, #f9f4e7 0%, #eadfc4 100%);
       }}
-      .hero-path {{
+      .toolbar-label {{
+        padding: 3px 8px;
+        border: 1px solid #94adc9;
+        background: var(--banner-light);
+        color: #234464;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }}
+      .toolbar-path {{
         margin: 0;
         color: var(--muted);
+        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+        font-size: 12px;
         overflow-wrap: anywhere;
       }}
-      .function-card {{
-        margin-bottom: 32px;
-        border: 3px solid var(--line);
-        background: var(--card);
-        box-shadow: var(--shadow);
+      .viewer-body {{
+        padding: 16px;
+        background:
+          linear-gradient(180deg, #dce3ea 0%, #e7ebf0 100%);
+      }}
+      .function-panel {{
+        margin-bottom: 18px;
+        border: 2px solid var(--line);
+        background: var(--panel-2);
+      }}
+      .function-panel:last-child {{
+        margin-bottom: 0;
       }}
       .function-head {{
-        padding: 18px 20px 14px;
-        border-bottom: 3px solid var(--line);
-        background: linear-gradient(180deg, var(--soft) 0%, #f6efe2 100%);
+        padding: 8px 12px;
+        border-bottom: 2px solid var(--line);
+        background: linear-gradient(180deg, #fcf8ee 0%, #ece2ca 100%);
       }}
       .function-title {{
         margin: 0;
-        font-size: 24px;
+        font-size: 17px;
+        line-height: 1.2;
       }}
       .function-signature {{
-        margin-top: 8px;
+        margin-top: 4px;
         color: var(--muted);
         font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-        font-size: 13px;
+        font-size: 12px;
       }}
       .function-body {{
-        padding: 18px;
-        background:
-          linear-gradient(180deg, rgba(255, 255, 255, 0.86), rgba(249, 244, 235, 0.78));
+        padding: 10px;
+        background: linear-gradient(180deg, #f9f5ea 0%, var(--panel) 100%);
+        overflow-x: auto;
       }}
       .ns-sequence {{
         display: flex;
         flex-direction: column;
-      }}
-      .ns-depth-0 {{
-        gap: 16px;
-      }}
-      .ns-depth-1,
-      .ns-depth-2,
-      .ns-depth-3,
-      .ns-depth-4 {{
         gap: 0;
       }}
-      .ns-node {{
-        overflow: hidden;
-        border: 2px solid var(--line);
-        background: var(--paper);
+      .ns-sequence > .ns-node + .ns-node,
+      .ns-cases > .case + .case,
+      .ns-catches > .ns-node + .ns-node {{
+        margin-top: -1px;
       }}
-      .ns-depth-0 > .ns-node {{
-        border-width: 3px;
-        box-shadow: 0 10px 24px rgba(23, 52, 74, 0.08);
+      .ns-node {{
+        min-width: 620px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        background: var(--action-fill);
       }}
       .ns-header,
       .ns-footer,
-      .ns-label,
       .case-title {{
-        padding: 10px 14px;
-        border-bottom: 2px solid var(--line);
-        background: var(--soft-2);
+        padding: 7px 10px;
+        background: linear-gradient(180deg, var(--banner) 0%, var(--banner-dark) 100%);
+        color: #ffffff;
+        font-size: 13px;
         font-weight: 700;
-        line-height: 1.35;
+        line-height: 1.3;
+        border-bottom: 1px solid var(--line);
         overflow-wrap: anywhere;
       }}
       .ns-footer {{
-        border-top: 2px solid var(--line);
+        border-top: 1px solid var(--line);
         border-bottom: 0;
       }}
-      .ns-label {{
-        border-bottom: 0;
-        background: var(--action-bg);
+      .ns-label,
+      .empty,
+      .ns-note {{
+        padding: 6px 10px;
+        border-top: 0;
+        background: var(--action-fill);
       }}
       .action-text {{
         display: block;
         font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-        font-size: 13px;
+        font-size: 12px;
         line-height: 1.45;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }}
       .ns-action {{
-        border-color: var(--action-line);
-        background: var(--action-bg);
+        background: var(--action-fill);
       }}
       .ns-if {{
-        border-color: var(--if-line);
-        background: var(--if-bg);
-      }}
-      .ns-if > .ns-header {{
-        background: var(--if-bg);
-        color: #8d5f11;
+        background: var(--action-fill);
       }}
       .ns-guard {{
-        border-color: var(--guard-line);
-        background: var(--guard-bg);
-      }}
-      .ns-guard > .ns-header {{
-        background: var(--guard-bg);
-        color: #8d352d;
+        background: var(--guard-fill);
       }}
       .ns-loop {{
-        border-color: var(--loop-line);
-        background: var(--loop-bg);
-      }}
-      .ns-loop > .ns-header,
-      .ns-repeat > .ns-header,
-      .ns-repeat > .ns-footer {{
-        background: var(--loop-bg);
-        color: #165d76;
+        background: var(--loop-fill);
       }}
       .ns-repeat {{
-        border-color: var(--loop-line);
-        background: var(--loop-bg);
+        background: var(--loop-fill);
       }}
       .ns-switch {{
-        border-color: var(--switch-line);
-        background: var(--switch-bg);
-      }}
-      .ns-switch > .ns-header {{
-        background: var(--switch-bg);
-        color: #145f4e;
+        background: var(--switch-fill);
       }}
       .ns-do-catch {{
-        border-color: var(--do-line);
-        background: var(--do-bg);
-      }}
-      .ns-do-catch > .ns-header {{
-        background: var(--do-bg);
-        color: #565044;
+        background: var(--do-fill);
       }}
       .ns-defer {{
-        border-color: var(--defer-line);
-        background: var(--defer-bg);
+        background: var(--defer-fill);
+      }}
+      .ns-guard > .ns-header {{
+        background: linear-gradient(180deg, #e58b52 0%, #c95d27 100%);
+      }}
+      .ns-switch > .ns-header,
+      .case-title {{
+        background: linear-gradient(180deg, #3f8f7d 0%, #266452 100%);
+      }}
+      .ns-do-catch > .ns-header {{
+        background: linear-gradient(180deg, #8f98a6 0%, #5f6874 100%);
       }}
       .ns-defer > .ns-header {{
-        background: var(--defer-bg);
-        color: #6e552f;
+        background: linear-gradient(180deg, #bc9a5b 0%, #8a6b35 100%);
       }}
       .ns-branches {{
         display: grid;
         grid-template-columns: 1fr 1fr;
+        background: #ffffff;
+      }}
+      .ns-branches-single {{
+        grid-template-columns: 1fr;
       }}
       .ns-branch {{
         min-width: 0;
-        border-left: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.6);
+        border-left: 1px solid var(--line);
+        background: #ffffff;
       }}
       .ns-branch:first-child {{
         border-left: 0;
       }}
       .ns-branch-title {{
-        padding: 9px 12px;
-        border-bottom: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.74);
-        color: var(--muted);
-        font-size: 12px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--line);
+        background: #edf2f7;
+        color: #37506b;
+        font-size: 11px;
         font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
       }}
       .ns-cases {{
-        background: rgba(255, 255, 255, 0.58);
+        background: #ffffff;
       }}
       .case {{
-        border-top: 2px solid var(--line);
+        border-top: 1px solid var(--line);
       }}
       .case:first-child {{
         border-top: 0;
       }}
       .ns-catches {{
-        border-top: 2px solid var(--line);
-      }}
-      .case-title {{
-        background: rgba(255, 255, 255, 0.74);
+        border-top: 1px solid var(--line);
       }}
       .empty {{
-        padding: 12px 14px;
         color: var(--muted);
         font-style: italic;
-        background: rgba(255, 255, 255, 0.6);
+        background: #f9fbfd;
       }}
       .ns-note {{
-        padding: 10px 14px;
-        border-top: 2px dashed rgba(23, 52, 74, 0.25);
-        color: var(--muted);
-        background: rgba(255, 255, 255, 0.48);
-        font-size: 13px;
+        color: #45607a;
+        font-size: 12px;
         font-style: italic;
+        background: var(--note-fill);
+        border-top: 1px solid var(--line);
+      }}
+      .ns-if-cap {{
+        position: relative;
+        min-height: 66px;
+        border-bottom: 1px solid var(--line);
+        background:
+          linear-gradient(
+            168deg,
+            var(--yes-fill) 0%,
+            var(--yes-fill) 48.8%,
+            var(--line) 49%,
+            var(--line) 50%,
+            var(--no-fill) 50.2%,
+            var(--no-fill) 100%
+          );
+      }}
+      .ns-if-cap::before {{
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        left: 0;
+        height: 24px;
+        background: linear-gradient(180deg, var(--banner) 0%, var(--banner-dark) 100%);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+      }}
+      .ns-if-condition {{
+        position: absolute;
+        top: 28px;
+        right: 14px;
+        left: 14px;
+        color: var(--text);
+        text-align: center;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.25;
+      }}
+      .ns-if-yes,
+      .ns-if-no {{
+        position: absolute;
+        bottom: 6px;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }}
+      .ns-if-yes {{
+        left: 10px;
+        color: #2c6a1c;
+      }}
+      .ns-if-no {{
+        right: 10px;
+        color: #a53a4b;
       }}
       .empty-file {{
         margin: 0;
@@ -286,35 +337,43 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       @media (max-width: 800px) {{
         body {{ padding: 16px; }}
-        .hero {{ padding: 20px; }}
-        .function-body {{ padding: 12px; }}
+        .viewer-body {{ padding: 10px; }}
+        .function-body {{ padding: 8px; }}
+        .ns-node {{ min-width: 0; }}
         .ns-branches {{ grid-template-columns: 1fr; }}
         .ns-branch {{
           border-left: 0;
-          border-top: 2px solid var(--line);
+          border-top: 1px solid var(--line);
         }}
         .ns-branch:first-child {{
           border-top: 0;
+        }}
+        .ns-if-cap {{
+          min-height: 72px;
+        }}
+        .ns-if-condition {{
+          right: 10px;
+          left: 10px;
         }}
       }}
     </style>
   </head>
   <body>
-    <main class="page">
-      <section class="hero">
-        <p class="eyebrow">Structured Control Flow</p>
-        <h1>Nassi-Shneiderman Control Flow</h1>
-        <p class="hero-path">{escape(diagram.source_location)}</p>
-      </section>
-      {sections}
-    </main>
+    <div class="viewer">
+      <div class="titlebar">Swifta NSD Viewer</div>
+      <div class="toolbar">
+        <div class="toolbar-label">Nassi-Shneiderman Control Flow</div>
+        <div class="toolbar-path">{escape(diagram.source_location)}</div>
+      </div>
+      <main class="viewer-body">{sections}</main>
+    </div>
   </body>
 </html>
 """
 
     def _render_function(self, function) -> str:
         return (
-            '<section class="function-card">'
+            '<section class="function-panel">'
             '<div class="function-head">'
             f'<h2 class="function-title">{escape(function.qualified_name)}</h2>'
             f'<div class="function-signature">{escape(function.signature)}</div>'
@@ -343,20 +402,22 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         if isinstance(step, IfFlowStep):
             if step.else_steps:
                 else_markup = (
-                    '<div class="ns-branch"><div class="ns-branch-title">Else</div>'
+                    '<div class="ns-branch" aria-label="Else branch">'
                     f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
                     "</div>"
                 )
+                branches_class = "ns-branches"
                 trailing_note = ""
             else:
                 else_markup = ""
-                trailing_note = '<div class="ns-note">Otherwise the flow continues.</div>'
+                branches_class = "ns-branches ns-branches-single"
+                trailing_note = '<div class="ns-note">No branch continues after the decision.</div>'
 
             return (
                 '<div class="ns-node ns-if">'
-                f"{self._render_header(f'If {step.condition}')}"
-                '<div class="ns-branches">'
-                '<div class="ns-branch"><div class="ns-branch-title">Then</div>'
+                f"{self._render_if_cap(step.condition)}"
+                f'<div class="{branches_class}">'
+                '<div class="ns-branch" aria-label="Then branch">'
                 f"{self._render_sequence(step.then_steps, depth=depth + 1)}"
                 "</div>"
                 f"{else_markup}"
@@ -441,6 +502,16 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     def _render_header(self, title: str) -> str:
         escaped = escape(title)
         return f'<div class="ns-header" aria-label="{escaped}">{escaped}</div>'
+
+    def _render_if_cap(self, condition: str) -> str:
+        escaped = escape(condition)
+        return (
+            f'<div class="ns-if-cap" aria-label="If {escaped}">'
+            f'<div class="ns-if-condition">{escaped}</div>'
+            '<div class="ns-if-yes">Yes</div>'
+            '<div class="ns-if-no">No</div>'
+            "</div>"
+        )
 
     def _render_footer(self, title: str) -> str:
         escaped = escape(title)

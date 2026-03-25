@@ -43,8 +43,9 @@ def test_nassi_service_builds_html_document() -> None:
     assert document.function_count == 2
     assert "score" in document.function_names
     assert "MathBox.normalize" in document.function_names
-    assert "WHILE total &gt; 100" in document.html
-    assert "SWITCH total" in document.html
+    assert "While total &gt; 100" in document.html
+    assert "Switch total" in document.html
+    assert "Swifta NSD Viewer" in document.html
 
 
 def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
