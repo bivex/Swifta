@@ -63,17 +63,53 @@ def parse_source_text(
     source_text: str,
     generated_types: GeneratedParserTypes | None = None,
 ) -> ParseTreeResult:
+    return _parse_entry_text(
+        source_text,
+        entry_rule_name="top_level",
+        generated_types=generated_types,
+    )
+
+
+def parse_code_block_text(
+    source_text: str,
+    generated_types: GeneratedParserTypes | None = None,
+) -> ParseTreeResult:
+    return _parse_entry_text(
+        source_text,
+        entry_rule_name="code_block",
+        generated_types=generated_types,
+    )
+
+
+def parse_statement_text(
+    source_text: str,
+    generated_types: GeneratedParserTypes | None = None,
+) -> ParseTreeResult:
+    return _parse_entry_text(
+        source_text,
+        entry_rule_name="statement",
+        generated_types=generated_types,
+    )
+
+
+def _parse_entry_text(
+    source_text: str,
+    *,
+    entry_rule_name: str,
+    generated_types: GeneratedParserTypes | None = None,
+) -> ParseTreeResult:
     generated = generated_types or load_generated_types()
 
     try:
-        return _parse_source_text_fast(source_text, generated)
+        return _parse_entry_text_fast(source_text, generated, entry_rule_name)
     except ParseCancellationException:
-        return _parse_source_text_full(source_text, generated)
+        return _parse_entry_text_full(source_text, generated, entry_rule_name)
 
 
-def _parse_source_text_fast(
+def _parse_entry_text_fast(
     source_text: str,
     generated: GeneratedParserTypes,
+    entry_rule_name: str,
 ) -> ParseTreeResult:
     lexer = generated.lexer_type(InputStream(source_text))
     lexer_errors = CollectingErrorListener()
@@ -86,7 +122,7 @@ def _parse_source_text_fast(
     parser._errHandler = BailErrorStrategy()
     parser.removeErrorListeners()
 
-    tree = parser.top_level()
+    tree = getattr(parser, entry_rule_name)()
     token_stream.fill()
 
     return ParseTreeResult(
@@ -97,9 +133,10 @@ def _parse_source_text_fast(
     )
 
 
-def _parse_source_text_full(
+def _parse_entry_text_full(
     source_text: str,
     generated: GeneratedParserTypes,
+    entry_rule_name: str,
 ) -> ParseTreeResult:
     lexer = generated.lexer_type(InputStream(source_text))
     lexer_errors = CollectingErrorListener()
@@ -112,7 +149,7 @@ def _parse_source_text_full(
     parser.removeErrorListeners()
     parser.addErrorListener(parser_errors)
 
-    tree = parser.top_level()
+    tree = getattr(parser, entry_rule_name)()
     token_stream.fill()
 
     return ParseTreeResult(

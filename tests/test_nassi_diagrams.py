@@ -8,6 +8,8 @@ from swifta.application.control_flow import (
     BuildNassiDirectoryCommand,
     NassiDiagramService,
 )
+from swifta.domain.model import SourceUnit, SourceUnitId
+from swifta.infrastructure.antlr import control_flow_extractor as control_flow_module
 from swifta.infrastructure.antlr.control_flow_extractor import AntlrSwiftControlFlowExtractor
 from swifta.infrastructure.filesystem.source_repository import FileSystemSourceRepository
 from swifta.infrastructure.rendering.nassi_html_renderer import HtmlNassiDiagramRenderer
@@ -85,6 +87,108 @@ enum Direction {
     assert document.function_count == 1
     assert document.function_names == ("Direction.score",)
     assert "Direction" in document.html
+
+
+def test_control_flow_extractor_uses_function_body_fast_path(monkeypatch) -> None:
+    _ensure_generated_parser()
+    extractor = AntlrSwiftControlFlowExtractor()
+
+    def _unexpected_full_parse(*args, **kwargs):
+        raise AssertionError("unexpected full-file parse fallback")
+
+    monkeypatch.setattr(control_flow_module, "parse_source_text", _unexpected_full_parse)
+
+    source = SourceUnit(
+        identifier=SourceUnitId("fast-path"),
+        location="fast-path.swift",
+        content="""
+class AccessibilityHelper {
+    private static var cachedWindows: (windows: [Int], timestamp: Date)?
+
+    static func check(_ value: Int) -> Int {
+        if value > 0 {
+            return value
+        }
+        return 0
+    }
+}
+""".strip(),
+    )
+
+    diagram = extractor.extract(source)
+
+    assert len(diagram.functions) == 1
+    assert diagram.functions[0].qualified_name == "AccessibilityHelper.check"
+    assert len(diagram.functions[0].steps) == 2
+
+
+def test_control_flow_extractor_shortcuts_action_only_bodies(monkeypatch) -> None:
+    _ensure_generated_parser()
+    extractor = AntlrSwiftControlFlowExtractor()
+
+    def _unexpected_full_parse(*args, **kwargs):
+        raise AssertionError("unexpected full-file parse fallback")
+
+    def _unexpected_code_block_parse(*args, **kwargs):
+        raise AssertionError("unexpected code-block parse for action-only function")
+
+    monkeypatch.setattr(control_flow_module, "parse_source_text", _unexpected_full_parse)
+    monkeypatch.setattr(control_flow_module, "parse_code_block_text", _unexpected_code_block_parse)
+
+    source = SourceUnit(
+        identifier=SourceUnitId("action-only"),
+        location="action-only.swift",
+        content="""
+class MathBox {
+    static func normalize(_ input: Int) -> Int {
+        let clamped = max(input, 0)
+        return clamped
+    }
+}
+""".strip(),
+    )
+
+    diagram = extractor.extract(source)
+
+    assert len(diagram.functions) == 1
+    assert diagram.functions[0].qualified_name == "MathBox.normalize"
+    assert [step.label for step in diagram.functions[0].steps] == [
+        "let clamped = max(input, 0)",
+        "return clamped",
+    ]
+
+
+def test_control_flow_extractor_unwraps_autoreleasepool_wrapper(monkeypatch) -> None:
+    _ensure_generated_parser()
+    extractor = AntlrSwiftControlFlowExtractor()
+
+    def _unexpected_full_parse(*args, **kwargs):
+        raise AssertionError("unexpected full-file parse fallback")
+
+    monkeypatch.setattr(control_flow_module, "parse_source_text", _unexpected_full_parse)
+
+    source = SourceUnit(
+        identifier=SourceUnitId("autoreleasepool"),
+        location="autoreleasepool.swift",
+        content="""
+class Worker {
+    static func run(_ value: Int) -> Int {
+        return autoreleasepool {
+            if value > 0 {
+                return value
+            }
+            return 0
+        }
+    }
+}
+""".strip(),
+    )
+
+    diagram = extractor.extract(source)
+
+    assert len(diagram.functions) == 1
+    assert diagram.functions[0].qualified_name == "Worker.run"
+    assert diagram.functions[0].steps[0].__class__.__name__ == "IfFlowStep"
 
 
 def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
