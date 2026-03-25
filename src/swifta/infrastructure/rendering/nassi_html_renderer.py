@@ -26,7 +26,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         sections = "".join(self._render_function(function) for function in diagram.functions)
         if not sections:
             sections = '<section class="function-card"><p class="empty-file">No functions found.</p></section>'
-        function_count = len(diagram.functions)
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -38,12 +37,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       :root {{
         --line: #17344a;
         --ink: #112233;
-        --paper: #fffdf8;
-        --canvas: #f4eee1;
-        --card: rgba(255, 255, 255, 0.88);
-        --soft: #eee1ca;
-        --soft-2: #f7f1e5;
         --muted: #6a5f53;
+        --canvas: #f4eee1;
+        --paper: #fffdf8;
+        --card: rgba(255, 255, 255, 0.9);
+        --soft: #efe3cf;
+        --soft-2: #fbf6ec;
+        --shadow: 0 18px 44px rgba(23, 52, 74, 0.12);
         --action-bg: #ffffff;
         --action-line: #baa98d;
         --if-bg: #fff0d5;
@@ -58,7 +58,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         --do-line: #6d665a;
         --defer-bg: #efe7d4;
         --defer-line: #86693f;
-        --shadow: 0 18px 44px rgba(23, 52, 74, 0.12);
       }}
       * {{ box-sizing: border-box; }}
       body {{
@@ -71,18 +70,14 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
           linear-gradient(180deg, #fffaf1 0%, var(--canvas) 100%);
       }}
       .page {{
-        max-width: 1280px;
+        max-width: 1180px;
         margin: 0 auto;
       }}
       .hero {{
-        display: flex;
-        justify-content: space-between;
-        gap: 20px;
-        align-items: flex-end;
         margin-bottom: 28px;
-        padding: 28px 30px;
+        padding: 24px 28px;
         border: 3px solid var(--line);
-        background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(250, 243, 229, 0.88));
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(250, 243, 229, 0.9));
         box-shadow: var(--shadow);
       }}
       .eyebrow {{
@@ -98,57 +93,11 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         font-size: 30px;
         line-height: 1.05;
       }}
-      .hero p {{
+      .hero-path {{
         margin: 0;
+        color: var(--muted);
         overflow-wrap: anywhere;
       }}
-      .hero-path {{
-        max-width: 760px;
-        color: var(--muted);
-      }}
-      .hero-stats {{
-        display: flex;
-        gap: 12px;
-        flex-wrap: wrap;
-      }}
-      .hero-pill {{
-        min-width: 120px;
-        padding: 12px 14px;
-        border: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.82);
-      }}
-      .hero-pill strong {{
-        display: block;
-        font-size: 22px;
-        line-height: 1;
-      }}
-      .hero-pill span {{
-        display: block;
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        font-weight: 700;
-      }}
-      .legend {{
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin: 0 0 24px;
-      }}
-      .legend-pill {{
-        padding: 9px 12px;
-        border: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.72);
-        font-size: 13px;
-        font-weight: 700;
-      }}
-      .legend-pill.if {{ background: var(--if-bg); border-color: var(--if-line); }}
-      .legend-pill.loop {{ background: var(--loop-bg); border-color: var(--loop-line); }}
-      .legend-pill.switch {{ background: var(--switch-bg); border-color: var(--switch-line); }}
-      .legend-pill.guard {{ background: var(--guard-bg); border-color: var(--guard-line); }}
-      .legend-pill.flow {{ background: var(--do-bg); border-color: var(--do-line); }}
       .function-card {{
         margin-bottom: 32px;
         border: 3px solid var(--line);
@@ -156,20 +105,9 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         box-shadow: var(--shadow);
       }}
       .function-head {{
-        padding: 18px 20px 12px;
+        padding: 18px 20px 14px;
         border-bottom: 3px solid var(--line);
         background: linear-gradient(180deg, var(--soft) 0%, #f6efe2 100%);
-      }}
-      .function-badge {{
-        display: inline-block;
-        margin-bottom: 10px;
-        padding: 5px 9px;
-        border: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.85);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        font-size: 11px;
-        font-weight: 800;
       }}
       .function-title {{
         margin: 0;
@@ -208,39 +146,27 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         border-width: 3px;
         box-shadow: 0 10px 24px rgba(23, 52, 74, 0.08);
       }}
-      .ns-header, .ns-footer, .ns-label, .case-title {{
-        display: flex;
-        gap: 10px;
-        align-items: center;
+      .ns-header,
+      .ns-footer,
+      .ns-label,
+      .case-title {{
         padding: 10px 14px;
         border-bottom: 2px solid var(--line);
         background: var(--soft-2);
+        font-weight: 700;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
       }}
       .ns-footer {{
         border-top: 2px solid var(--line);
         border-bottom: 0;
       }}
-      .node-tag {{
-        flex: 0 0 auto;
-        padding: 4px 8px;
-        border: 2px solid currentColor;
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-size: 11px;
-        line-height: 1;
-        font-weight: 800;
-      }}
-      .node-text {{
-        min-width: 0;
-        font-weight: 700;
-        overflow-wrap: anywhere;
-      }}
       .ns-label {{
-        background: var(--action-bg);
         border-bottom: 0;
-        align-items: flex-start;
+        background: var(--action-bg);
       }}
       .action-text {{
+        display: block;
         font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
         font-size: 13px;
         line-height: 1.45;
@@ -250,9 +176,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-action {{
         border-color: var(--action-line);
         background: var(--action-bg);
-      }}
-      .ns-action .node-tag {{
-        color: #7f6a4a;
       }}
       .ns-if {{
         border-color: var(--if-line);
@@ -315,7 +238,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-branch {{
         min-width: 0;
         border-left: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.58);
+        background: rgba(255, 255, 255, 0.6);
       }}
       .ns-branch:first-child {{
         border-left: 0;
@@ -323,14 +246,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-branch-title {{
         padding: 9px 12px;
         border-bottom: 2px solid var(--line);
-        background: rgba(255, 255, 255, 0.7);
-        text-transform: uppercase;
-        letter-spacing: 0.04em;
+        background: rgba(255, 255, 255, 0.74);
+        color: var(--muted);
         font-size: 12px;
         font-weight: 700;
       }}
       .ns-cases {{
-        background: rgba(255, 255, 255, 0.55);
+        background: rgba(255, 255, 255, 0.58);
       }}
       .case {{
         border-top: 2px solid var(--line);
@@ -342,13 +264,21 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         border-top: 2px solid var(--line);
       }}
       .case-title {{
-        background: rgba(255, 255, 255, 0.72);
+        background: rgba(255, 255, 255, 0.74);
       }}
       .empty {{
         padding: 12px 14px;
         color: var(--muted);
         font-style: italic;
         background: rgba(255, 255, 255, 0.6);
+      }}
+      .ns-note {{
+        padding: 10px 14px;
+        border-top: 2px dashed rgba(23, 52, 74, 0.25);
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.48);
+        font-size: 13px;
+        font-style: italic;
       }}
       .empty-file {{
         margin: 0;
@@ -357,40 +287,24 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       @media (max-width: 800px) {{
         body {{ padding: 16px; }}
         .hero {{ padding: 20px; }}
-        .hero,
-        .hero-stats {{ flex-direction: column; align-items: stretch; }}
-        .ns-branches {{ grid-template-columns: 1fr; }}
-        .ns-branch {{ border-left: 0; border-top: 2px solid var(--line); }}
-        .ns-branch:first-child {{ border-top: 0; }}
         .function-body {{ padding: 12px; }}
+        .ns-branches {{ grid-template-columns: 1fr; }}
+        .ns-branch {{
+          border-left: 0;
+          border-top: 2px solid var(--line);
+        }}
+        .ns-branch:first-child {{
+          border-top: 0;
+        }}
       }}
     </style>
   </head>
   <body>
     <main class="page">
       <section class="hero">
-        <div>
-          <p class="eyebrow">Structured Control Flow</p>
-          <h1>Nassi-Shneiderman Control Flow</h1>
-          <p class="hero-path">{escape(diagram.source_location)}</p>
-        </div>
-        <div class="hero-stats">
-          <div class="hero-pill">
-            <strong>{function_count}</strong>
-            <span>Functions</span>
-          </div>
-          <div class="hero-pill">
-            <strong>HTML</strong>
-            <span>Diagram Output</span>
-          </div>
-        </div>
-      </section>
-      <section class="legend">
-        <div class="legend-pill if">Decisions</div>
-        <div class="legend-pill loop">Loops</div>
-        <div class="legend-pill switch">Switch Cases</div>
-        <div class="legend-pill guard">Exit Guards</div>
-        <div class="legend-pill flow">Flow Blocks</div>
+        <p class="eyebrow">Structured Control Flow</p>
+        <h1>Nassi-Shneiderman Control Flow</h1>
+        <p class="hero-path">{escape(diagram.source_location)}</p>
       </section>
       {sections}
     </main>
@@ -402,7 +316,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         return (
             '<section class="function-card">'
             '<div class="function-head">'
-            '<div class="function-badge">Function</div>'
             f'<h2 class="function-title">{escape(function.qualified_name)}</h2>'
             f'<div class="function-signature">{escape(function.signature)}</div>'
             "</div>"
@@ -422,45 +335,54 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         if isinstance(step, ActionFlowStep):
             return (
                 '<div class="ns-node ns-action">'
-                '<div class="ns-label">'
-                '<span class="node-tag">Action</span>'
+                f'<div class="ns-label" aria-label="Action {escape(step.label)}">'
                 f'<code class="action-text">{escape(step.label)}</code>'
                 "</div>"
                 "</div>"
             )
         if isinstance(step, IfFlowStep):
+            if step.else_steps:
+                else_markup = (
+                    '<div class="ns-branch"><div class="ns-branch-title">Else</div>'
+                    f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
+                    "</div>"
+                )
+                trailing_note = ""
+            else:
+                else_markup = ""
+                trailing_note = '<div class="ns-note">Otherwise the flow continues.</div>'
+
             return (
                 '<div class="ns-node ns-if">'
-                f"{self._render_header('If', step.condition)}"
+                f"{self._render_header(f'If {step.condition}')}"
                 '<div class="ns-branches">'
-                '<div class="ns-branch"><div class="ns-branch-title">Then path</div>'
+                '<div class="ns-branch"><div class="ns-branch-title">Then</div>'
                 f"{self._render_sequence(step.then_steps, depth=depth + 1)}"
                 "</div>"
-                '<div class="ns-branch"><div class="ns-branch-title">Else path</div>'
-                f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
+                f"{else_markup}"
                 "</div>"
-                "</div>"
+                f"{trailing_note}"
                 "</div>"
             )
         if isinstance(step, GuardFlowStep):
             return (
                 '<div class="ns-node ns-guard">'
-                f"{self._render_header('Guard', step.condition)}"
+                f"{self._render_header(f'Guard {step.condition}')}"
                 '<div class="ns-branch"><div class="ns-branch-title">Failure / exit</div>'
                 f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
                 "</div>"
                 "</div>"
             )
         if isinstance(step, WhileFlowStep):
-            return self._render_single_body("While", step.condition, step.body_steps, depth=depth)
+            return self._render_single_body(f"While {step.condition}", step.body_steps, depth=depth)
         if isinstance(step, ForInFlowStep):
-            return self._render_single_body("For", step.header, step.body_steps, depth=depth)
+            return self._render_single_body(f"For {step.header}", step.body_steps, depth=depth)
         if isinstance(step, RepeatWhileFlowStep):
             return (
                 '<div class="ns-node ns-repeat">'
-                f"{self._render_header('Repeat', '')}"
+                f"{self._render_header('Repeat')}"
                 f"{self._render_sequence(step.body_steps, depth=depth + 1)}"
-                f"{self._render_footer('While', step.condition)}"
+                f"{self._render_footer(f'While {step.condition}')}"
                 "</div>"
             )
         if isinstance(step, SwitchFlowStep):
@@ -468,24 +390,29 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             cases_markup = cases or '<div class="empty">No cases.</div>'
             return (
                 '<div class="ns-node ns-switch">'
-                f"{self._render_header('Switch', step.expression)}"
+                f"{self._render_header(f'Switch {step.expression}')}"
                 f'<div class="ns-cases">{cases_markup}</div>'
                 "</div>"
             )
         if isinstance(step, DoCatchFlowStep):
             catches = "".join(
-                self._render_single_body("Catch", catch.pattern, catch.steps, depth=depth + 1)
+                self._render_single_body(
+                    f"Catch {catch.pattern}",
+                    catch.steps,
+                    depth=depth + 1,
+                    css_class="ns-do-catch",
+                )
                 for catch in step.catches
             )
             return (
                 '<div class="ns-node ns-do-catch">'
-                f"{self._render_header('Do', '')}"
+                f"{self._render_header('Do')}"
                 f"{self._render_sequence(step.body_steps, depth=depth + 1)}"
                 f'<div class="ns-catches">{catches}</div>'
                 "</div>"
             )
         if isinstance(step, DeferFlowStep):
-            return self._render_single_body("Defer", "", step.body_steps, depth=depth, css_class="ns-defer")
+            return self._render_single_body("Defer", step.body_steps, depth=depth, css_class="ns-defer")
         raise TypeError(f"unsupported step type: {type(step)!r}")
 
     def _render_case(self, case: SwitchCaseFlow) -> str:
@@ -498,8 +425,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
     def _render_single_body(
         self,
-        keyword: str,
-        label: str,
+        title: str,
         steps: tuple[ControlFlowStep, ...],
         *,
         depth: int,
@@ -507,42 +433,28 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     ) -> str:
         return (
             f'<div class="ns-node {css_class}">'
-            f"{self._render_header(keyword, label)}"
+            f"{self._render_header(title)}"
             f"{self._render_sequence(steps, depth=depth + 1)}"
             "</div>"
         )
 
-    def _render_header(self, keyword: str, label: str) -> str:
-        text = escape(label) if label else "Structured block"
-        aria_label = escape(f"{keyword.upper()} {label}".strip() or keyword.upper())
-        return (
-            f'<div class="ns-header" aria-label="{aria_label}">'
-            f'<span class="node-tag">{escape(keyword)}</span>'
-            f'<span class="node-text">{text}</span>'
-            "</div>"
-        )
+    def _render_header(self, title: str) -> str:
+        escaped = escape(title)
+        return f'<div class="ns-header" aria-label="{escaped}">{escaped}</div>'
 
-    def _render_footer(self, keyword: str, label: str) -> str:
-        aria_label = escape(f"{keyword.upper()} {label}".strip() or keyword.upper())
-        return (
-            f'<div class="ns-footer" aria-label="{aria_label}">'
-            f'<span class="node-tag">{escape(keyword)}</span>'
-            f'<span class="node-text">{escape(label)}</span>'
-            "</div>"
-        )
+    def _render_footer(self, title: str) -> str:
+        escaped = escape(title)
+        return f'<div class="ns-footer" aria-label="{escaped}">{escaped}</div>'
 
     def _render_case_title(self, label: str) -> str:
-        normalized = label.strip()
-        if normalized.startswith("default"):
-            keyword = "Default"
-            text = normalized
-        else:
-            keyword = "Case"
-            text = normalized
-        aria_label = escape(f"{keyword.upper()} {text}".strip())
-        return (
-            f'<div class="case-title" aria-label="{aria_label}">'
-            f'<span class="node-tag">{escape(keyword)}</span>'
-            f'<span class="node-text">{escape(text)}</span>'
-            "</div>"
-        )
+        text = self._normalize_case_label(label.strip())
+        escaped = escape(text)
+        return f'<div class="case-title" aria-label="{escaped}">{escaped}</div>'
+
+    def _normalize_case_label(self, label: str) -> str:
+        compact = label.removesuffix(":").strip()
+        if compact.startswith("default"):
+            return "default"
+        if compact.startswith("case "):
+            return compact
+        return compact
