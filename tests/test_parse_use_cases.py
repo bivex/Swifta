@@ -60,8 +60,8 @@ def test_parse_directory_returns_report_for_all_files() -> None:
     service = _build_service()
     report = service.parse_directory(ParseDirectoryCommand(root_path=str(ROOT / "tests" / "fixtures")))
 
-    assert report.summary.source_count == 2
-    assert len(report.sources) == 2
+    assert report.summary.source_count == 3
+    assert len(report.sources) == 3
 
 
 def test_cli_outputs_json() -> None:
@@ -83,4 +83,3 @@ def test_cli_outputs_json() -> None:
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["summary"]["source_count"] == 1
-

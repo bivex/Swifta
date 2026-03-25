@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Sequence
 
+from swifta.domain.control_flow import ControlFlowDiagram
 from swifta.domain.events import DomainEvent
 from swifta.domain.model import GrammarVersion, ParseOutcome, ParsingJob, SourceUnit
 
@@ -37,6 +38,18 @@ class SwiftSyntaxParser(ABC):
         raise NotImplementedError
 
 
+class SwiftControlFlowExtractor(ABC):
+    @abstractmethod
+    def extract(self, source_unit: SourceUnit) -> ControlFlowDiagram:
+        raise NotImplementedError
+
+
+class NassiDiagramRenderer(ABC):
+    @abstractmethod
+    def render(self, diagram: ControlFlowDiagram) -> str:
+        raise NotImplementedError
+
+
 class DomainEventPublisher(ABC):
     @abstractmethod
     def publish(self, event: DomainEvent) -> None:
@@ -47,4 +60,3 @@ class Clock(ABC):
     @abstractmethod
     def now(self) -> datetime:
         raise NotImplementedError
-

@@ -2,13 +2,8 @@
 
 from __future__ import annotations
 
-import importlib
-from dataclasses import dataclass
 from time import perf_counter
 
-from antlr4 import CommonTokenStream, InputStream
-
-from swifta.domain.errors import GeneratedParserNotAvailableError
 from swifta.domain.model import (
     GrammarVersion,
     ParseOutcome,
@@ -18,24 +13,16 @@ from swifta.domain.model import (
     StructuralElementKind,
 )
 from swifta.domain.ports import SwiftSyntaxParser
-from swifta.infrastructure.antlr.error_listener import CollectingErrorListener
-
-
-ANTLR_GRAMMAR_VERSION = GrammarVersion(
-    "antlr4@4.13.2+python-compat:antlr/grammars-v4/swift/swift5 (targets Swift 5.4)"
+from swifta.infrastructure.antlr.runtime import (
+    ANTLR_GRAMMAR_VERSION,
+    load_generated_types,
+    parse_source_text,
 )
-
-
-@dataclass(frozen=True, slots=True)
-class _GeneratedParserTypes:
-    lexer_type: type
-    parser_type: type
-    visitor_type: type
 
 
 class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
     def __init__(self) -> None:
-        self._generated = _load_generated_types()
+        self._generated = load_generated_types()
 
     @property
     def grammar_version(self) -> GrammarVersion:
@@ -44,36 +31,22 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
     def parse(self, source_unit: SourceUnit) -> ParseOutcome:
         started_at = perf_counter()
         try:
-            lexer = self._generated.lexer_type(InputStream(source_unit.content))
-            lexer_errors = CollectingErrorListener()
-            lexer.removeErrorListeners()
-            lexer.addErrorListener(lexer_errors)
-
-            token_stream = CommonTokenStream(lexer)
-            parser = self._generated.parser_type(token_stream)
-            parser_errors = CollectingErrorListener()
-            parser.removeErrorListeners()
-            parser.addErrorListener(parser_errors)
-
-            tree = parser.top_level()
-            token_stream.fill()
-
+            parse_result = parse_source_text(source_unit.content, self._generated)
             structure_visitor = _build_structure_visitor(self._generated.visitor_type)()
-            structure_visitor.visit(tree)
+            structure_visitor.visit(parse_result.tree)
 
-            diagnostics = tuple(lexer_errors.diagnostics + parser_errors.diagnostics)
             elements = tuple(structure_visitor.elements)
             elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
 
             return ParseOutcome.success(
                 source_unit=source_unit,
                 grammar_version=self.grammar_version,
-                diagnostics=diagnostics,
+                diagnostics=parse_result.diagnostics,
                 structural_elements=elements,
                 statistics=ParseStatistics(
-                    token_count=len(token_stream.tokens),
+                    token_count=len(parse_result.token_stream.tokens),
                     structural_element_count=len(elements),
-                    diagnostic_count=len(diagnostics),
+                    diagnostic_count=len(parse_result.diagnostics),
                     elapsed_ms=elapsed_ms,
                 ),
             )
@@ -85,30 +58,6 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                 message=str(error),
                 elapsed_ms=elapsed_ms,
             )
-
-
-def _load_generated_types() -> _GeneratedParserTypes:
-    try:
-        lexer_module = importlib.import_module(
-            "swifta.infrastructure.antlr.generated.swift5.Swift5Lexer"
-        )
-        parser_module = importlib.import_module(
-            "swifta.infrastructure.antlr.generated.swift5.Swift5Parser"
-        )
-        visitor_module = importlib.import_module(
-            "swifta.infrastructure.antlr.generated.swift5.Swift5ParserVisitor"
-        )
-    except ModuleNotFoundError as error:
-        raise GeneratedParserNotAvailableError(
-            "generated Swift parser artifacts are missing; run "
-            "`uv run python scripts/generate_swift_parser.py` first"
-        ) from error
-
-    return _GeneratedParserTypes(
-        lexer_type=lexer_module.Swift5Lexer,
-        parser_type=parser_module.Swift5Parser,
-        visitor_type=visitor_module.Swift5ParserVisitor,
-    )
 
 
 def _build_structure_visitor(visitor_base: type) -> type:

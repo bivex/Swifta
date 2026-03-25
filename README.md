@@ -15,6 +15,7 @@ Today the system supports:
 
 * parsing one Swift file
 * parsing a directory of Swift files
+* building a Nassi-Shneiderman HTML diagram for one Swift file
 * reporting syntax diagnostics as part of the contract
 * extracting a lightweight structural model: imports, type declarations, functions, variables, and extensions
 * keeping parser infrastructure behind ports so the application layer stays independent from ANTLR, filesystem, and CLI details
@@ -54,6 +55,12 @@ uv run swifta parse-file path/to/File.swift
 
 ```bash
 uv run swifta parse-dir path/to/project
+```
+
+5. Build a Nassi-Shneiderman diagram for a Swift file:
+
+```bash
+uv run swifta nassi-file path/to/Algorithms.swift --out output/algorithms.nassi.html
 ```
 
 ## Constraints and honesty
