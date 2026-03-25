@@ -3,7 +3,11 @@ import subprocess
 import sys
 from pathlib import Path
 
-from swifta.application.control_flow import BuildNassiDiagramCommand, NassiDiagramService
+from swifta.application.control_flow import (
+    BuildNassiDiagramCommand,
+    BuildNassiDirectoryCommand,
+    NassiDiagramService,
+)
 from swifta.infrastructure.antlr.control_flow_extractor import AntlrSwiftControlFlowExtractor
 from swifta.infrastructure.filesystem.source_repository import FileSystemSourceRepository
 from swifta.infrastructure.rendering.nassi_html_renderer import HtmlNassiDiagramRenderer
@@ -48,6 +52,18 @@ def test_nassi_service_builds_html_document() -> None:
     assert "Swifta NSD Viewer" in document.html
 
 
+def test_nassi_service_builds_directory_bundle() -> None:
+    service = _build_service()
+    bundle = service.build_directory_diagrams(
+        BuildNassiDirectoryCommand(root_path=str(ROOT / "tests" / "fixtures"))
+    )
+
+    assert bundle.document_count == 3
+    assert bundle.root_path == str((ROOT / "tests" / "fixtures").resolve())
+    assert any(document.source_location.endswith("control_flow.swift") for document in bundle.documents)
+    assert any(document.function_count == 2 for document in bundle.documents)
+
+
 def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
     _ensure_generated_parser()
     output_path = tmp_path / "control_flow.html"
@@ -74,3 +90,35 @@ def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
     assert payload["output_path"] == str(output_path.resolve())
     assert output_path.exists()
     assert "Nassi-Shneiderman Control Flow" in output_path.read_text(encoding="utf-8")
+
+
+def test_nassi_dir_cli_writes_html_bundle(tmp_path: Path) -> None:
+    _ensure_generated_parser()
+    output_dir = tmp_path / "nassi-bundle"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "swifta.presentation.cli.main",
+            "nassi-dir",
+            str(ROOT / "tests" / "fixtures"),
+            "--out",
+            str(output_dir),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["document_count"] == 3
+    assert payload["output_dir"] == str(output_dir.resolve())
+    assert payload["index_path"] == str((output_dir / "index.html").resolve())
+    assert len(payload["documents"]) == 3
+    assert (output_dir / "index.html").exists()
+    assert (output_dir / "control_flow.nassi.html").exists()
+    assert (output_dir / "invalid.nassi.html").exists()
+    assert "Swifta NSD Index" in (output_dir / "index.html").read_text(encoding="utf-8")
