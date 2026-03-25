@@ -232,7 +232,7 @@ def _build_control_flow_visitor(visitor_base: type, context: _ExtractorContext) 
 
         def _extract_for_in_statement(self, for_ctx) -> ForInFlowStep:
             return ForInFlowStep(
-                header=f"for {context.compact(for_ctx.pattern())} in {context.compact(for_ctx.expression())}",
+                header=f"{context.compact(for_ctx.pattern())} in {context.compact(for_ctx.expression())}",
                 body_steps=self._extract_code_block(for_ctx.code_block()),
             )
 
@@ -267,4 +267,3 @@ def _build_control_flow_visitor(visitor_base: type, context: _ExtractorContext) 
             )
 
     return SwiftControlFlowVisitor
-
