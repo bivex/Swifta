@@ -129,7 +129,7 @@ def _build_structure_visitor(visitor_base: type) -> type:
             return None
 
         def visitEnum_declaration(self, ctx):
-            name = ctx.enum_name().getText()
+            name = self._extract_enum_name(ctx)
             self._append(StructuralElementKind.ENUM, name, ctx, signature=f"enum {name}")
             return self._with_container(name, lambda: self.visitChildren(ctx))
 
@@ -182,6 +182,13 @@ def _build_structure_visitor(visitor_base: type) -> type:
                 return callback()
             finally:
                 self._containers.pop()
+
+        def _extract_enum_name(self, enum_ctx) -> str:
+            if enum_ctx.union_style_enum() is not None:
+                return enum_ctx.union_style_enum().enum_name().getText()
+            if enum_ctx.raw_value_style_enum() is not None:
+                return enum_ctx.raw_value_style_enum().enum_name().getText()
+            return "enum"
 
         def _extract_pattern_names(self, pattern_initializer_list_ctx) -> tuple[str, ...]:
             names: list[str] = []

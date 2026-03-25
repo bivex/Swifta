@@ -78,7 +78,7 @@ def _build_control_flow_visitor(visitor_base: type, context: _ExtractorContext) 
             return self._with_container(name, lambda: self.visitChildren(ctx))
 
         def visitEnum_declaration(self, ctx):
-            name = ctx.enum_name().getText()
+            name = self._extract_enum_name(ctx)
             return self._with_container(name, lambda: self.visitChildren(ctx))
 
         def visitProtocol_declaration(self, ctx):
@@ -112,6 +112,13 @@ def _build_control_flow_visitor(visitor_base: type, context: _ExtractorContext) 
                 return callback()
             finally:
                 self._containers.pop()
+
+        def _extract_enum_name(self, enum_ctx) -> str:
+            if enum_ctx.union_style_enum() is not None:
+                return enum_ctx.union_style_enum().enum_name().getText()
+            if enum_ctx.raw_value_style_enum() is not None:
+                return enum_ctx.raw_value_style_enum().enum_name().getText()
+            return "enum"
 
         def _extract_code_block(self, code_block_ctx) -> tuple[ControlFlowStep, ...]:
             if code_block_ctx is None or code_block_ctx.statements() is None:

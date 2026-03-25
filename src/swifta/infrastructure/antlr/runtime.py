@@ -6,6 +6,9 @@ import importlib
 from dataclasses import dataclass
 
 from antlr4 import CommonTokenStream, InputStream
+from antlr4.atn.PredictionMode import PredictionMode
+from antlr4.error.ErrorStrategy import BailErrorStrategy
+from antlr4.error.Errors import ParseCancellationException
 
 from swifta.domain.errors import GeneratedParserNotAvailableError
 from swifta.domain.model import GrammarVersion, SyntaxDiagnostic
@@ -62,6 +65,42 @@ def parse_source_text(
 ) -> ParseTreeResult:
     generated = generated_types or load_generated_types()
 
+    try:
+        return _parse_source_text_fast(source_text, generated)
+    except ParseCancellationException:
+        return _parse_source_text_full(source_text, generated)
+
+
+def _parse_source_text_fast(
+    source_text: str,
+    generated: GeneratedParserTypes,
+) -> ParseTreeResult:
+    lexer = generated.lexer_type(InputStream(source_text))
+    lexer_errors = CollectingErrorListener()
+    lexer.removeErrorListeners()
+    lexer.addErrorListener(lexer_errors)
+
+    token_stream = CommonTokenStream(lexer)
+    parser = generated.parser_type(token_stream)
+    parser._interp.predictionMode = PredictionMode.SLL
+    parser._errHandler = BailErrorStrategy()
+    parser.removeErrorListeners()
+
+    tree = parser.top_level()
+    token_stream.fill()
+
+    return ParseTreeResult(
+        token_stream=token_stream,
+        parser=parser,
+        tree=tree,
+        diagnostics=tuple(lexer_errors.diagnostics),
+    )
+
+
+def _parse_source_text_full(
+    source_text: str,
+    generated: GeneratedParserTypes,
+) -> ParseTreeResult:
     lexer = generated.lexer_type(InputStream(source_text))
     lexer_errors = CollectingErrorListener()
     lexer.removeErrorListeners()
@@ -82,4 +121,3 @@ def parse_source_text(
         tree=tree,
         diagnostics=tuple(lexer_errors.diagnostics + parser_errors.diagnostics),
     )
-

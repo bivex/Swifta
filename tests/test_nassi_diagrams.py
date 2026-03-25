@@ -64,6 +64,29 @@ def test_nassi_service_builds_directory_bundle() -> None:
     assert any(document.function_count == 2 for document in bundle.documents)
 
 
+def test_nassi_service_handles_enum_container(tmp_path: Path) -> None:
+    service = _build_service()
+    source_path = tmp_path / "enum_fixture.swift"
+    source_path.write_text(
+        """
+enum Direction {
+    case north
+
+    func score() -> Int {
+        return 1
+    }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    document = service.build_file_diagram(BuildNassiDiagramCommand(path=str(source_path)))
+
+    assert document.function_count == 1
+    assert document.function_names == ("Direction.score",)
+    assert "Direction" in document.html
+
+
 def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
     _ensure_generated_parser()
     output_path = tmp_path / "control_flow.html"

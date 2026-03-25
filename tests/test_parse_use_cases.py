@@ -64,6 +64,29 @@ def test_parse_directory_returns_report_for_all_files() -> None:
     assert len(report.sources) == 3
 
 
+def test_parse_file_handles_enum_declaration(tmp_path: Path) -> None:
+    service = _build_service()
+    source_path = tmp_path / "enum_parse.swift"
+    source_path.write_text(
+        """
+enum Mode {
+    case active
+
+    func title() -> String {
+        return "active"
+    }
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    report = service.parse_file(ParseFileCommand(path=str(source_path)))
+
+    assert report.summary.source_count == 1
+    assert report.summary.technical_failure_count == 0
+    assert {element.kind for element in report.sources[0].structural_elements} >= {"enum", "function"}
+
+
 def test_cli_outputs_json() -> None:
     _ensure_generated_parser()
     result = subprocess.run(
