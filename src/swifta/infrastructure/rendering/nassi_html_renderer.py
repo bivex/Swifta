@@ -138,6 +138,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         color: var(--muted);
         font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
         font-size: 12px;
+        overflow-wrap: anywhere;
+        word-break: break-word;
       }}
       .function-body {{
         padding: 10px;
@@ -156,7 +158,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-node {{
         min-width: 620px;
-        overflow: hidden;
         border: 1px solid var(--line);
         background: var(--action-fill);
       }}
@@ -278,57 +279,66 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         background: var(--note-fill);
         border-top: 1px solid var(--line);
       }}
+      .ns-node.ns-loop,
+      .ns-node.ns-repeat {{ border-left: 4px solid #1778df; }}
+      .ns-node.ns-guard {{ border-left: 4px solid #c95d27; }}
+      .ns-node.ns-switch {{ border-left: 4px solid #266452; }}
+      .ns-node.ns-do-catch {{ border-left: 4px solid #5f6874; }}
+      .ns-node.ns-defer {{ border-left: 4px solid #8a6b35; }}
+      .ns-depth-1 > .ns-node {{ background-color: rgba(0, 0, 0, 0.012); }}
+      .ns-depth-2 > .ns-node {{ background-color: rgba(0, 0, 0, 0.022); }}
+      .ns-depth-3 > .ns-node {{ background-color: rgba(0, 0, 0, 0.032); }}
       .ns-if-cap {{
-        position: relative;
-        min-height: 66px;
+        display: flex;
+        flex-direction: column;
         border-bottom: 1px solid var(--line);
-        background:
-          linear-gradient(
-            168deg,
-            var(--yes-fill) 0%,
-            var(--yes-fill) 48.8%,
-            var(--line) 49%,
-            var(--line) 50%,
-            var(--no-fill) 50.2%,
-            var(--no-fill) 100%
-          );
       }}
-      .ns-if-cap::before {{
-        content: "";
-        position: absolute;
-        top: 0;
-        right: 0;
-        left: 0;
-        height: 24px;
+      .ns-if-top {{
+        padding: 5px 10px;
         background: linear-gradient(180deg, var(--banner) 0%, var(--banner-dark) 100%);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.25);
+        color: #fff;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }}
+      .ns-if-body {{
+        background: linear-gradient(
+          168deg,
+          var(--yes-fill) 0%,
+          var(--yes-fill) 48.8%,
+          var(--line) 49%,
+          var(--line) 50%,
+          var(--no-fill) 50.2%,
+          var(--no-fill) 100%
+        );
       }}
       .ns-if-condition {{
-        position: absolute;
-        top: 28px;
-        right: 14px;
-        left: 14px;
+        padding: 8px 14px 4px;
         color: var(--text);
         text-align: center;
         font-size: 13px;
         font-weight: 700;
-        line-height: 1.25;
+        line-height: 1.35;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+      }}
+      .ns-if-labels {{
+        display: flex;
+        justify-content: space-between;
+        padding: 4px 10px 6px;
       }}
       .ns-if-yes,
       .ns-if-no {{
-        position: absolute;
-        bottom: 6px;
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
       }}
       .ns-if-yes {{
-        left: 10px;
         color: #2c6a1c;
       }}
       .ns-if-no {{
-        right: 10px;
         color: #a53a4b;
       }}
       .empty-file {{
@@ -347,13 +357,6 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         }}
         .ns-branch:first-child {{
           border-top: 0;
-        }}
-        .ns-if-cap {{
-          min-height: 72px;
-        }}
-        .ns-if-condition {{
-          right: 10px;
-          left: 10px;
         }}
       }}
     </style>
@@ -507,9 +510,14 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(condition)
         return (
             f'<div class="ns-if-cap" aria-label="If {escaped}">'
+            '<div class="ns-if-top">if</div>'
+            '<div class="ns-if-body">'
             f'<div class="ns-if-condition">{escaped}</div>'
-            '<div class="ns-if-yes">Yes</div>'
-            '<div class="ns-if-no">No</div>'
+            '<div class="ns-if-labels">'
+            '<span class="ns-if-yes">Yes</span>'
+            '<span class="ns-if-no">No</span>'
+            "</div>"
+            "</div>"
             "</div>"
         )
 
