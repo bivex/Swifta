@@ -430,6 +430,8 @@ class TestIfDepthRendering:
         assert 'class="ns-if-cap ns-if-depth-0"' in html
         assert '<svg class="ns-if-svg"' in html
         assert "x &gt; 0" in html
+        assert 'width="400"' in html
+        assert 'height="72"' in html
 
     def test_render_if_cap_at_depth_five(self) -> None:
         renderer = HtmlNassiDiagramRenderer()
@@ -466,6 +468,20 @@ class TestIfDepthRendering:
         html = renderer._render_if_cap("x > 0", depth=100)
         assert 'class="ns-if-cap ns-if-depth-50"' in html
         assert "㊿" in html
+
+    def test_render_if_cap_expands_svg_for_long_conditions(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap(
+            "request.user.profile.permissions.canAccessScopedResource && "
+            "request.executionContext.region.isAllowedForThisOperation",
+            depth=2,
+        )
+        match = re.search(r'viewBox="0 0 (\d+) (\d+)"', html)
+        assert match is not None
+        width = int(match.group(1))
+        height = int(match.group(2))
+        assert width > 400
+        assert height >= 72
 
     def test_nested_ifs_in_html_output(self) -> None:
         service = _build_service()

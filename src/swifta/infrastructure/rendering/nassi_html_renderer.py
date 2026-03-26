@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from html import escape
+from math import ceil
+import re
 
 from swifta.domain.control_flow import (
     ActionFlowStep,
@@ -294,9 +296,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-if-svg {{
         display: block;
-        width: 100%;
         height: auto;
-        max-height: 80px;
       }}
       .ns-if-triangle {{
         fill: var(--blue-dim);
@@ -312,7 +312,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-if-condition-text {{
         font-family: var(--mono);
-        font-size: 12px;
+        font-size: 13px;
         font-weight: 500;
         color: var(--text-bright);
         text-align: center;
@@ -610,22 +610,60 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(title)
         return f'<div class="ns-header" aria-label="{escaped}">{escaped}</div>'
 
+    def _if_cap_geometry(self, condition: str, badge: str) -> tuple[int, int, int, int, int]:
+        text = f"{badge} {condition}".strip()
+        char_count = max(len(text), 12)
+        tokens = [token for token in re.split(r"\s+", text) if token]
+        longest_token = max((len(token) for token in tokens), default=char_count)
+
+        content_width = max(
+            360,
+            min(
+                1600,
+                max(longest_token * 8 + 48, ceil(char_count / 2) * 7 + 64),
+            ),
+        )
+        svg_width = content_width + 40
+        chars_per_line = max(18, int(content_width / 7.4))
+        line_count = max(
+            1,
+            ceil(char_count / chars_per_line),
+            ceil(longest_token / chars_per_line),
+        )
+        text_height = 24 + (line_count - 1) * 17
+        split_y = 18 + text_height
+        svg_height = split_y + 30
+        return svg_width, svg_height, content_width, text_height, split_y
+
     def _render_if_cap(self, condition: str, *, depth: int = 0) -> str:
         escaped = escape(condition)
         d = min(depth, 50)
         badge = self._depth_badge(d)
-        # SVG with foreignObject for proper text wrapping
+        svg_width, svg_height, content_width, text_height, split_y = self._if_cap_geometry(
+            condition,
+            badge,
+        )
+        half_width = svg_width / 2
+        yes_x = svg_width / 4
+        no_x = svg_width * 0.75
+        label_y = svg_height - 8
+
         return (
             f'<div class="ns-if-cap ns-if-depth-{d}" aria-label="If {escaped}">'
-            '<svg class="ns-if-svg" viewBox="0 0 400 80" preserveAspectRatio="xMidYMid meet">'
-            f'<polygon points="0,0 400,0 200,50" class="ns-if-triangle ns-if-depth-{d}-triangle"/>'
-            f'<foreignObject x="20" y="5" width="360" height="45" class="ns-if-condition-fo">'
+            f'<svg class="ns-if-svg" viewBox="0 0 {svg_width} {svg_height}" '
+            f'width="{svg_width}" height="{svg_height}" preserveAspectRatio="xMidYMid meet">'
+            f'<polygon points="0,0 {svg_width},0 {half_width},{split_y}" '
+            f'class="ns-if-triangle ns-if-depth-{d}-triangle"/>'
+            f'<foreignObject x="20" y="6" width="{content_width}" height="{text_height}" '
+            'class="ns-if-condition-fo">'
             f'<div xmlns="http://www.w3.org/1999/xhtml" class="ns-if-condition-text">{badge} {escaped}</div>'
             '</foreignObject>'
-            f'<line x1="0" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
-            f'<line x1="400" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
-            f'<text x="100" y="72" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
-            f'<text x="300" y="72" text-anchor="middle" class="ns-if-label-no">No</text>'
+            f'<line x1="0" y1="{split_y}" x2="{half_width}" y2="{svg_height}" '
+            f'class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
+            f'<line x1="{svg_width}" y1="{split_y}" x2="{half_width}" y2="{svg_height}" '
+            f'class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
+            f'<text x="{yes_x}" y="{label_y}" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
+            f'<text x="{no_x}" y="{label_y}" text-anchor="middle" class="ns-if-label-no">No</text>'
             '</svg>'
             "</div>"
         )
