@@ -13,12 +13,34 @@ The project starts from the domain, not from the framework:
 
 Today the system supports:
 
-* parsing one Swift file
-* parsing a directory of Swift files
-* building a Nassi-Shneiderman HTML diagram for one Swift file
-* reporting syntax diagnostics as part of the contract
-* extracting a lightweight structural model: imports, type declarations, functions, variables, and extensions
-* keeping parser infrastructure behind ports so the application layer stays independent from ANTLR, filesystem, and CLI details
+* **Parsing Swift code**
+  * parsing one Swift file
+  * parsing a directory of Swift files
+  * extracting a lightweight structural model: imports, type declarations, functions, variables, and extensions
+  * reporting syntax diagnostics as part of the contract
+
+* **Control flow extraction**
+  * if/else statements with nested branches
+  * guard statements
+  * while loops
+  * for-in loops
+  * repeat-while loops
+  * switch/case statements
+  * do-catch blocks
+  * defer blocks
+  * trailing closure expansion (`.map{}`, `.forEach{}`, `.reduce{}`)
+
+* **Nassi-Shneiderman diagrams**
+  * building a Nassi-Shneiderman HTML diagram for one Swift file
+  * building diagram bundles for entire directories with index page
+  * classic NS rendering with SVG triangles for if-blocks
+  * depth-coded nested ifs (up to 50 levels with color cycling and Unicode badges ①-㊿)
+  * classic case block structure with side-by-side columns
+  * dark Tokyo Night-inspired theme with JetBrains Mono font
+  * proper text wrapping and responsive layout
+
+* **Architecture**
+  * keeping parser infrastructure behind ports so the application layer stays independent from ANTLR, filesystem, and CLI details
 
 ## Architecture
 
@@ -63,6 +85,12 @@ uv run swifta parse-dir path/to/project
 uv run swifta nassi-file path/to/Algorithms.swift --out output/algorithms.nassi.html
 ```
 
+6. Build Nassi-Shneiderman diagrams for an entire directory:
+
+```bash
+uv run swifta nassi-dir path/to/project --out output/nassi-bundle
+```
+
 ## Constraints and honesty
 
 The current ANTLR grammar is sourced from `antlr/grammars-v4/swift/swift5`. Its own README states that it targets Swift 5.4 syntax, is not fully aligned with the Swift compiler, and has known ambiguities. The upstream grammar also needs a compatibility patch step for Python target generation because the original grammar ships with Java-oriented support code and embedded actions. Swifta makes those limitations explicit in requirements, ADRs, and runtime metadata so downstream consumers know what contract they are integrating with.
@@ -71,8 +99,10 @@ The current ANTLR grammar is sourced from `antlr/grammars-v4/swift/swift5`. Its 
 
 Useful future extensions:
 
-* richer declaration extraction
+* richer control flow visualization (async/await, actors, SwiftUI)
 * symbol graph export
 * semantic passes on top of the structural model
 * integration adapters for external analysis tools
 * incremental parsing and caching
+* interactive HTML diagrams with collapsible nodes
+* export to other diagram formats (SVG, PNG, Mermaid)
