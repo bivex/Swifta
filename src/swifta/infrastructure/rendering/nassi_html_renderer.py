@@ -316,6 +316,27 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-if-yes {{ color: var(--green); }}
       .ns-if-no  {{ color: var(--red);   }}
 
+      /* Depth-coded if-cap headers: 0=blue 1=green 2=purple 3=teal 4=amber */
+      .ns-if-depth-0 .ns-if-top {{ background: var(--blue-dim);   color: var(--blue);   }}
+      .ns-if-depth-1 .ns-if-top {{ background: var(--green-dim);  color: var(--green);  }}
+      .ns-if-depth-2 .ns-if-top {{ background: var(--purple-dim); color: var(--purple); }}
+      .ns-if-depth-3 .ns-if-top {{ background: var(--teal-dim);   color: var(--teal);   }}
+      .ns-if-depth-4 .ns-if-top {{ background: var(--amber-dim);  color: var(--amber);  }}
+
+      /* Depth-coded diagonal body gradient */
+      .ns-if-depth-1 .ns-if-body {{
+        background: linear-gradient(168deg, #0e1f10 0%, #0e1f10 48.5%, var(--border) 49%, var(--border) 50%, #1e0e18 50.5%, #1e0e18 100%);
+      }}
+      .ns-if-depth-2 .ns-if-body {{
+        background: linear-gradient(168deg, #14102a 0%, #14102a 48.5%, var(--border) 49%, var(--border) 50%, #2a1014 50.5%, #2a1014 100%);
+      }}
+      .ns-if-depth-3 .ns-if-body {{
+        background: linear-gradient(168deg, #0c1e25 0%, #0c1e25 48.5%, var(--border) 49%, var(--border) 50%, #1e0c14 50.5%, #1e0c14 100%);
+      }}
+      .ns-if-depth-4 .ns-if-body {{
+        background: linear-gradient(168deg, #221600 0%, #221600 48.5%, var(--border) 49%, var(--border) 50%, #220010 50.5%, #220010 100%);
+      }}
+
       .ns-branches {{
         display: grid;
         grid-template-columns: 1fr 1fr;
@@ -323,8 +344,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-branches-single {{ grid-template-columns: 1fr; }}
       .ns-branch {{
-        min-width: 0;
-        border-left: 1px solid var(--border);
+        min-width: 200px;
+        border-left: 2px solid var(--border);
         background: var(--surface-2);
       }}
       .ns-branch:first-child {{ border-left: 0; }}
@@ -437,7 +458,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
             return (
                 '<div class="ns-node ns-if">'
-                f"{self._render_if_cap(step.condition)}"
+                f"{self._render_if_cap(step.condition, depth=depth)}"
                 f'<div class="{branches_class}">'
                 '<div class="ns-branch" aria-label="Then branch">'
                 f"{self._render_sequence(step.then_steps, depth=depth + 1)}"
@@ -525,11 +546,15 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(title)
         return f'<div class="ns-header" aria-label="{escaped}">{escaped}</div>'
 
-    def _render_if_cap(self, condition: str) -> str:
+    _DEPTH_BADGES = ("", " ①", " ②", " ③", " ④")
+
+    def _render_if_cap(self, condition: str, *, depth: int = 0) -> str:
         escaped = escape(condition)
+        d = min(depth, 4)
+        badge = self._DEPTH_BADGES[d]
         return (
-            f'<div class="ns-if-cap" aria-label="If {escaped}">'
-            '<div class="ns-if-top">if</div>'
+            f'<div class="ns-if-cap ns-if-depth-{d}" aria-label="If {escaped}">'
+            f'<div class="ns-if-top">if{badge}</div>'
             '<div class="ns-if-body">'
             f'<div class="ns-if-condition">{escaped}</div>'
             '<div class="ns-if-labels">'
