@@ -549,3 +549,55 @@ class TestIfDepthRendering:
             re.DOTALL,
         )
         assert "580px" not in css
+
+    def test_if_branches_use_green_and_red_highlight_classes(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_step(
+            IfFlowStep(
+                condition="flag",
+                then_steps=(ActionFlowStep("return success"),),
+                else_steps=(ActionFlowStep("return failure"),),
+            ),
+            depth=0,
+        )
+
+        assert 'class="ns-branch ns-branch-yes"' in html
+        assert 'class="ns-branch ns-branch-no"' in html
+        assert "rgba(158, 206, 106" in renderer.render(
+            ControlFlowDiagram(
+                source_location="branch-colors.swift",
+                functions=(
+                    FunctionControlFlow(
+                        name="f",
+                        signature="func f()",
+                        container=None,
+                        steps=(
+                            IfFlowStep(
+                                condition="flag",
+                                then_steps=(ActionFlowStep("return success"),),
+                                else_steps=(ActionFlowStep("return failure"),),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )
+        assert "rgba(247, 118, 142" in renderer.render(
+            ControlFlowDiagram(
+                source_location="branch-colors.swift",
+                functions=(
+                    FunctionControlFlow(
+                        name="f",
+                        signature="func f()",
+                        container=None,
+                        steps=(
+                            IfFlowStep(
+                                condition="flag",
+                                then_steps=(ActionFlowStep("return success"),),
+                                else_steps=(ActionFlowStep("return failure"),),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        )

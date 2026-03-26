@@ -403,6 +403,36 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         border-left: 2px solid var(--border);
         background: var(--surface-2);
       }}
+      .ns-branch-yes {{
+        background: rgba(158, 206, 106, 0.08);
+      }}
+      .ns-branch-no {{
+        background: rgba(247, 118, 142, 0.08);
+      }}
+      .ns-branch-yes > .ns-sequence > .ns-node {{
+        background: rgba(158, 206, 106, 0.12);
+      }}
+      .ns-branch-no > .ns-sequence > .ns-node {{
+        background: rgba(247, 118, 142, 0.12);
+      }}
+      .ns-branch-yes .ns-label,
+      .ns-branch-yes .empty,
+      .ns-branch-yes .ns-note {{
+        background: rgba(158, 206, 106, 0.14);
+      }}
+      .ns-branch-no .ns-label,
+      .ns-branch-no .empty,
+      .ns-branch-no .ns-note {{
+        background: rgba(247, 118, 142, 0.14);
+      }}
+      .ns-branch-yes > .ns-branch-title {{
+        background: rgba(158, 206, 106, 0.2);
+        color: var(--green);
+      }}
+      .ns-branch-no > .ns-branch-title {{
+        background: rgba(247, 118, 142, 0.18);
+        color: var(--red);
+      }}
       .ns-branch:first-child {{ border-left: 0; }}
       .ns-branch-title {{
         padding: 5px 10px;
@@ -516,7 +546,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         if isinstance(step, IfFlowStep):
             if step.else_steps:
                 else_markup = (
-                    '<div class="ns-branch" aria-label="Else branch">'
+                    '<div class="ns-branch ns-branch-no" aria-label="Else branch">'
                     f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
                     "</div>"
                 )
@@ -531,7 +561,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 '<div class="ns-node ns-if">'
                 f"{self._render_if_cap(step.condition, depth=depth)}"
                 f'<div class="{branches_class}">'
-                '<div class="ns-branch" aria-label="Then branch">'
+                '<div class="ns-branch ns-branch-yes" aria-label="Then branch">'
                 f"{self._render_sequence(step.then_steps, depth=depth + 1)}"
                 "</div>"
                 f"{else_markup}"
@@ -543,7 +573,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             return (
                 '<div class="ns-node ns-guard">'
                 f"{self._render_header(f'Guard {step.condition}')}"
-                '<div class="ns-branch"><div class="ns-branch-title">Failure / exit</div>'
+                '<div class="ns-branch ns-branch-no"><div class="ns-branch-title">Failure / exit</div>'
                 f"{self._render_sequence(step.else_steps, depth=depth + 1)}"
                 "</div>"
                 "</div>"
