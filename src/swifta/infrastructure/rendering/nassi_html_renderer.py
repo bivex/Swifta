@@ -33,25 +33,12 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
     def _depth_css(self) -> str:
         colors = ["blue", "green", "purple", "teal", "amber"]
-        top_rules = []
-        body_rules = []
+        rules = []
         for i in range(51):
             c = colors[i % 5]
-            top_rules.append(f"      .ns-if-depth-{i} .ns-if-top {{ background: var(--{c}-dim); color: var(--{c}); }}")
-            if i >= 1:
-                # Rotate hue for diagonal gradient: each depth shifts by 15deg
-                hue_yes = (120 + i * 15) % 360
-                hue_no = (340 + i * 15) % 360
-                body_rules.append(
-                    f"      .ns-if-depth-{i} .ns-if-body {{\n"
-                    f"        background: linear-gradient(168deg, "
-                    f"hsl({hue_yes}, 30%, 9%) 0%, hsl({hue_yes}, 30%, 9%) 48.5%, "
-                    f"var(--border) 49%, var(--border) 50%, "
-                    f"hsl({hue_no}, 35%, 8%) 50.5%, hsl({hue_no}, 35%, 8%) 100%);\n"
-                    f"        overflow: hidden;\n"
-                    f"      }}"
-                )
-        return "\n".join(top_rules) + "\n\n      /* Depth-coded diagonal body gradient */\n" + "\n".join(body_rules)
+            rules.append(f"      .ns-if-depth-{i}-triangle {{ fill: var(--{c}-dim); stroke: var(--{c}); }}")
+            rules.append(f"      .ns-if-depth-{i}-diagonal {{ stroke: var(--{c}); }}")
+        return "\n".join(rules)
 
     def render(self, diagram: ControlFlowDiagram) -> str:
         sections = "".join(self._render_function(function) for function in diagram.functions)
@@ -294,69 +281,52 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-depth-2 > .ns-node {{ background-color: rgba(255,255,255,0.020); }}
       .ns-depth-3 > .ns-node {{ background-color: rgba(255,255,255,0.028); }}
 
-      /* ── If/else branches ── */
+      /* ── If/else branches (classic NS diagram with SVG) ── */
       .ns-if-cap {{
-        display: flex;
-        flex-direction: column;
         border-bottom: 1px solid var(--border);
-        overflow: hidden;
+        line-height: 0;
       }}
-      .ns-if-top {{
-        padding: 5px 10px;
-        background: var(--blue-dim);
-        color: var(--blue);
+      .ns-if-svg {{
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 80px;
+      }}
+      .ns-if-triangle {{
+        fill: var(--blue-dim);
+        stroke: var(--border);
+        stroke-width: 1;
+      }}
+      .ns-if-diagonal {{
+        stroke: var(--border);
+        stroke-width: 1;
+      }}
+      .ns-if-condition-text {{
         font-family: var(--mono);
-        font-size: 10px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }}
-      .ns-if-body {{
-        background: linear-gradient(
-          168deg,
-          var(--yes-fill)  0%,
-          var(--yes-fill)  48.5%,
-          var(--border)    49%,
-          var(--border)    50%,
-          var(--no-fill)   50.5%,
-          var(--no-fill)  100%
-        );
-        overflow: hidden;
-      }}
-      .ns-if-condition {{
-        padding: 9px 16px 5px;
-        color: var(--text-bright);
-        text-align: center;
-        font-family: var(--mono);
-        font-size: 12.5px;
+        font-size: 13px;
         font-weight: 500;
-        line-height: 1.45;
+        fill: var(--text-bright);
         word-break: break-word;
         overflow-wrap: anywhere;
       }}
-      .ns-if-labels {{
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        padding: 4px 0 7px;
-      }}
-      .ns-if-label-yes,
-      .ns-if-label-no {{
-        padding: 0 10px;
-        text-align: center;
-      }}
-      .ns-if-label-yes {{ text-align: left; }}
-      .ns-if-label-no {{ text-align: right; }}
-      .ns-if-yes,
-      .ns-if-no {{
-        font-size: 10px;
+      .ns-if-label-yes {{
+        font-family: var(--mono);
+        font-size: 11px;
         font-weight: 700;
+        fill: var(--green);
         text-transform: uppercase;
         letter-spacing: 0.06em;
       }}
-      .ns-if-yes {{ color: var(--green); }}
-      .ns-if-no  {{ color: var(--red);   }}
+      .ns-if-label-no {{
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 700;
+        fill: var(--red);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }}
 
-      /* Depth-coded if-cap headers (0-50, cycling blue→green→purple→teal→amber) */
+      /* Depth-coded if-cap triangles and diagonals (0-50, cycling blue→green→purple→teal→amber) */
 {self._depth_css()}
 
       .ns-branches {{
@@ -572,16 +542,17 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(condition)
         d = min(depth, 50)
         badge = self._depth_badge(d)
+        # SVG height: 80px (triangle 50px + labels 30px)
         return (
             f'<div class="ns-if-cap ns-if-depth-{d}" aria-label="If {escaped}">'
-            f'<div class="ns-if-top">if{badge}</div>'
-            '<div class="ns-if-body">'
-            f'<div class="ns-if-condition">{escaped}</div>'
-            '<div class="ns-if-labels">'
-            '<div class="ns-if-label-yes"><span class="ns-if-yes">Yes</span></div>'
-            '<div class="ns-if-label-no"><span class="ns-if-no">No</span></div>'
-            "</div>"
-            "</div>"
+            f'<svg class="ns-if-svg" viewBox="0 0 400 80" preserveAspectRatio="none">'
+            f'<polygon points="0,0 400,0 200,50" class="ns-if-triangle ns-if-depth-{d}-triangle"/>'
+            f'<text x="200" y="28" text-anchor="middle" class="ns-if-condition-text">{badge} {escaped}</text>'
+            f'<line x1="0" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
+            f'<line x1="400" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
+            f'<text x="100" y="72" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
+            f'<text x="300" y="72" text-anchor="middle" class="ns-if-label-no">No</text>'
+            f'</svg>'
             "</div>"
         )
 
