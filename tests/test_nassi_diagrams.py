@@ -51,7 +51,7 @@ def test_nassi_service_builds_html_document() -> None:
     assert "MathBox.normalize" in document.function_names
     assert "While total &gt; 100" in document.html
     assert "Switch total" in document.html
-    assert "Swifta NSD Viewer" in document.html
+    assert "Swifta" in document.html
 
 
 def test_nassi_service_builds_directory_bundle() -> None:

@@ -33,123 +33,162 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nassi-Shneiderman Control Flow</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {{
-        --line: #20354d;
-        --line-soft: #58718f;
-        --page: #b5bec8;
-        --window: #ece7d7;
-        --panel: #f7f2e4;
-        --panel-2: #fffdf8;
-        --text: #0f1825;
-        --muted: #536273;
-        --shadow: 0 20px 46px rgba(19, 34, 52, 0.24);
-        --banner: #1778df;
-        --banner-dark: #0b58b0;
-        --banner-light: #dcecff;
-        --loop-fill: #edf5ff;
-        --switch-fill: #eef8f3;
-        --guard-fill: #fff1e7;
-        --do-fill: #efeff2;
-        --defer-fill: #f6efdf;
-        --yes-fill: #d8f1c9;
-        --no-fill: #ffd7dc;
-        --action-fill: #ffffff;
-        --note-fill: #eef3f8;
+        /* Palette — Tokyo Night-inspired dark */
+        --bg:          #13141f;
+        --surface:     #1a1b2e;
+        --surface-2:   #1f2335;
+        --surface-3:   #24283b;
+        --border:      #2e3354;
+        --border-soft: #1e2240;
+        --text:        #c0caf5;
+        --text-bright: #e2e8ff;
+        --muted:       #565f89;
+        --shadow:      0 8px 32px rgba(0, 0, 0, 0.55);
+
+        /* Accent colours */
+        --blue:        #7aa2f7;
+        --blue-dim:    #3d59a1;
+        --green:       #9ece6a;
+        --green-dim:   #1a3320;
+        --red:         #f7768e;
+        --red-dim:     #2d1420;
+        --orange:      #ff9e64;
+        --orange-dim:  #2d1e10;
+        --teal:        #2ac3de;
+        --teal-dim:    #0e2830;
+        --purple:      #bb9af7;
+        --purple-dim:  #201830;
+        --amber:       #e0af68;
+        --amber-dim:   #2a1e08;
+
+        /* Block fills */
+        --loop-fill:   #141d2e;
+        --switch-fill: #0f1e20;
+        --guard-fill:  #1e1508;
+        --do-fill:     #16141e;
+        --defer-fill:  #1e1a0a;
+        --yes-fill:    #0f1e12;
+        --no-fill:     #1e0f14;
+        --action-fill: var(--surface-2);
+        --note-fill:   #141622;
+
+        /* Code font */
+        --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", "Menlo", monospace;
+        --ui:   "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
       }}
-      * {{ box-sizing: border-box; }}
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
       body {{
-        margin: 0;
-        padding: 24px;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-family: var(--ui);
+        font-size: 14px;
         color: var(--text);
-        background:
-          radial-gradient(circle at top left, rgba(255, 255, 255, 0.7), transparent 24%),
-          linear-gradient(180deg, #d8dfe6 0%, var(--page) 100%);
+        background: var(--bg);
+        padding: 24px;
+        min-height: 100vh;
       }}
+      /* ── Viewer shell ── */
       .viewer {{
-        max-width: 1180px;
+        max-width: 1200px;
         margin: 0 auto;
-        border: 2px solid var(--line);
-        background: var(--window);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--surface);
         box-shadow: var(--shadow);
+        overflow: hidden;
       }}
       .titlebar {{
-        padding: 8px 14px;
-        color: #ffffff;
-        font-size: 18px;
-        font-weight: 700;
-        letter-spacing: 0.01em;
-        background: linear-gradient(180deg, #3394ff 0%, var(--banner) 48%, var(--banner-dark) 100%);
-        text-shadow: 0 1px 0 rgba(0, 0, 0, 0.28);
+        padding: 10px 16px;
+        background: var(--surface-3);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }}
+      .titlebar-icon {{
+        width: 14px; height: 14px;
+        border-radius: 50%;
+        background: var(--blue-dim);
+        border: 1px solid var(--blue);
+        flex-shrink: 0;
+      }}
+      .titlebar-text {{
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text-bright);
+        letter-spacing: 0.02em;
       }}
       .toolbar {{
+        padding: 8px 16px;
+        border-bottom: 1px solid var(--border-soft);
+        background: var(--surface);
         display: flex;
         flex-wrap: wrap;
-        gap: 10px 16px;
-        align-items: center;
-        padding: 8px 14px;
-        border-top: 1px solid rgba(255, 255, 255, 0.35);
-        border-bottom: 2px solid var(--line-soft);
-        background: linear-gradient(180deg, #f9f4e7 0%, #eadfc4 100%);
+        gap: 8px 14px;
+        align-items: baseline;
       }}
       .toolbar-label {{
-        padding: 3px 8px;
-        border: 1px solid #94adc9;
-        background: var(--banner-light);
-        color: #234464;
-        font-size: 11px;
-        font-weight: 700;
+        font-size: 10px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
+        color: var(--blue);
+        background: rgba(122, 162, 247, 0.1);
+        border: 1px solid rgba(122, 162, 247, 0.25);
+        border-radius: 3px;
+        padding: 2px 7px;
+        white-space: nowrap;
       }}
       .toolbar-path {{
-        margin: 0;
+        font-family: var(--mono);
+        font-size: 11.5px;
         color: var(--muted);
-        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-        font-size: 12px;
         overflow-wrap: anywhere;
       }}
+      /* ── Viewer body ── */
       .viewer-body {{
         padding: 16px;
-        background:
-          linear-gradient(180deg, #dce3ea 0%, #e7ebf0 100%);
+        background: var(--bg);
       }}
+      /* ── Function panel ── */
       .function-panel {{
-        margin-bottom: 18px;
-        border: 2px solid var(--line);
-        background: var(--panel-2);
+        margin-bottom: 16px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        overflow: hidden;
       }}
-      .function-panel:last-child {{
-        margin-bottom: 0;
-      }}
+      .function-panel:last-child {{ margin-bottom: 0; }}
       .function-head {{
-        padding: 8px 12px;
-        border-bottom: 2px solid var(--line);
-        background: linear-gradient(180deg, #fcf8ee 0%, #ece2ca 100%);
+        padding: 10px 14px;
+        background: var(--surface-3);
+        border-bottom: 1px solid var(--border);
       }}
       .function-title {{
-        margin: 0;
-        font-size: 17px;
-        line-height: 1.2;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text-bright);
+        line-height: 1.3;
       }}
       .function-signature {{
-        margin-top: 4px;
+        margin-top: 3px;
+        font-family: var(--mono);
+        font-size: 11.5px;
+        line-height: 1.5;
         color: var(--muted);
-        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-        font-size: 12px;
         overflow-wrap: anywhere;
         word-break: break-word;
       }}
       .function-body {{
         padding: 10px;
-        background: linear-gradient(180deg, #f9f5ea 0%, var(--panel) 100%);
+        background: var(--bg);
         overflow-x: auto;
       }}
+      /* ── Node sequence ── */
       .ns-sequence {{
         display: flex;
         flex-direction: column;
-        gap: 0;
       }}
       .ns-sequence > .ns-node + .ns-node,
       .ns-cases > .case + .case,
@@ -157,216 +196,196 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         margin-top: -1px;
       }}
       .ns-node {{
-        min-width: 620px;
-        border: 1px solid var(--line);
+        min-width: 580px;
+        border: 1px solid var(--border);
+        border-radius: 3px;
         background: var(--action-fill);
       }}
+      /* ── Block headers/footers ── */
       .ns-header,
       .ns-footer,
       .case-title {{
-        padding: 7px 10px;
-        background: linear-gradient(180deg, var(--banner) 0%, var(--banner-dark) 100%);
-        color: #ffffff;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.3;
-        border-bottom: 1px solid var(--line);
+        padding: 6px 10px;
+        background: var(--blue-dim);
+        color: var(--blue);
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        line-height: 1.4;
+        border-bottom: 1px solid var(--border);
         overflow-wrap: anywhere;
+        word-break: break-word;
       }}
       .ns-footer {{
-        border-top: 1px solid var(--line);
+        border-top: 1px solid var(--border);
         border-bottom: 0;
       }}
+      /* ── Action label ── */
       .ns-label,
       .empty,
       .ns-note {{
-        padding: 6px 10px;
-        border-top: 0;
+        padding: 5px 10px;
         background: var(--action-fill);
       }}
       .action-text {{
         display: block;
-        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
-        font-size: 12px;
-        line-height: 1.45;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        line-height: 1.6;
+        color: var(--text);
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }}
-      .ns-action {{
-        background: var(--action-fill);
-      }}
-      .ns-if {{
-        background: var(--action-fill);
-      }}
-      .ns-guard {{
-        background: var(--guard-fill);
-      }}
-      .ns-loop {{
-        background: var(--loop-fill);
-      }}
-      .ns-repeat {{
-        background: var(--loop-fill);
-      }}
-      .ns-switch {{
-        background: var(--switch-fill);
-      }}
-      .ns-do-catch {{
-        background: var(--do-fill);
-      }}
-      .ns-defer {{
-        background: var(--defer-fill);
-      }}
-      .ns-guard > .ns-header {{
-        background: linear-gradient(180deg, #e58b52 0%, #c95d27 100%);
-      }}
-      .ns-switch > .ns-header,
-      .case-title {{
-        background: linear-gradient(180deg, #3f8f7d 0%, #266452 100%);
-      }}
-      .ns-do-catch > .ns-header {{
-        background: linear-gradient(180deg, #8f98a6 0%, #5f6874 100%);
-      }}
-      .ns-defer > .ns-header {{
-        background: linear-gradient(180deg, #bc9a5b 0%, #8a6b35 100%);
-      }}
-      .ns-branches {{
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        background: #ffffff;
-      }}
-      .ns-branches-single {{
-        grid-template-columns: 1fr;
-      }}
-      .ns-branch {{
-        min-width: 0;
-        border-left: 1px solid var(--line);
-        background: #ffffff;
-      }}
-      .ns-branch:first-child {{
-        border-left: 0;
-      }}
-      .ns-branch-title {{
-        padding: 6px 10px;
-        border-bottom: 1px solid var(--line);
-        background: #edf2f7;
-        color: #37506b;
-        font-size: 11px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-      }}
-      .ns-cases {{
-        background: #ffffff;
-      }}
-      .case {{
-        border-top: 1px solid var(--line);
-      }}
-      .case:first-child {{
-        border-top: 0;
-      }}
-      .ns-catches {{
-        border-top: 1px solid var(--line);
-      }}
-      .empty {{
-        color: var(--muted);
-        font-style: italic;
-        background: #f9fbfd;
-      }}
-      .ns-note {{
-        color: #45607a;
-        font-size: 12px;
-        font-style: italic;
-        background: var(--note-fill);
-        border-top: 1px solid var(--line);
-      }}
+      /* ── Block type colours ── */
+      .ns-guard   {{ background: var(--guard-fill); }}
+      .ns-loop,
+      .ns-repeat  {{ background: var(--loop-fill); }}
+      .ns-switch  {{ background: var(--switch-fill); }}
+      .ns-do-catch {{ background: var(--do-fill); }}
+      .ns-defer   {{ background: var(--defer-fill); }}
+
+      .ns-guard   > .ns-header {{ background: var(--orange-dim); color: var(--orange); }}
+      .ns-switch  > .ns-header,
+      .case-title              {{ background: var(--teal-dim);   color: var(--teal);   }}
+      .ns-do-catch > .ns-header {{ background: var(--purple-dim); color: var(--purple); }}
+      .ns-defer   > .ns-header {{ background: var(--amber-dim);  color: var(--amber);  }}
+
+      /* Left accent stripes */
       .ns-node.ns-loop,
-      .ns-node.ns-repeat {{ border-left: 4px solid #1778df; }}
-      .ns-node.ns-guard {{ border-left: 4px solid #c95d27; }}
-      .ns-node.ns-switch {{ border-left: 4px solid #266452; }}
-      .ns-node.ns-do-catch {{ border-left: 4px solid #5f6874; }}
-      .ns-node.ns-defer {{ border-left: 4px solid #8a6b35; }}
-      .ns-depth-1 > .ns-node {{ background-color: rgba(0, 0, 0, 0.012); }}
-      .ns-depth-2 > .ns-node {{ background-color: rgba(0, 0, 0, 0.022); }}
-      .ns-depth-3 > .ns-node {{ background-color: rgba(0, 0, 0, 0.032); }}
+      .ns-node.ns-repeat  {{ border-left: 3px solid var(--blue); }}
+      .ns-node.ns-guard   {{ border-left: 3px solid var(--orange); }}
+      .ns-node.ns-switch  {{ border-left: 3px solid var(--teal); }}
+      .ns-node.ns-do-catch {{ border-left: 3px solid var(--purple); }}
+      .ns-node.ns-defer   {{ border-left: 3px solid var(--amber); }}
+
+      /* Depth tinting */
+      .ns-depth-1 > .ns-node {{ background-color: rgba(255,255,255,0.012); }}
+      .ns-depth-2 > .ns-node {{ background-color: rgba(255,255,255,0.020); }}
+      .ns-depth-3 > .ns-node {{ background-color: rgba(255,255,255,0.028); }}
+
+      /* ── If/else branches ── */
       .ns-if-cap {{
         display: flex;
         flex-direction: column;
-        border-bottom: 1px solid var(--line);
+        border-bottom: 1px solid var(--border);
       }}
       .ns-if-top {{
         padding: 5px 10px;
-        background: linear-gradient(180deg, var(--banner) 0%, var(--banner-dark) 100%);
-        color: #fff;
-        font-size: 11px;
-        font-weight: 700;
+        background: var(--blue-dim);
+        color: var(--blue);
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
       }}
       .ns-if-body {{
         background: linear-gradient(
           168deg,
-          var(--yes-fill) 0%,
-          var(--yes-fill) 48.8%,
-          var(--line) 49%,
-          var(--line) 50%,
-          var(--no-fill) 50.2%,
-          var(--no-fill) 100%
+          var(--yes-fill)  0%,
+          var(--yes-fill)  48.5%,
+          var(--border)    49%,
+          var(--border)    50%,
+          var(--no-fill)   50.5%,
+          var(--no-fill)  100%
         );
       }}
       .ns-if-condition {{
-        padding: 8px 14px 4px;
-        color: var(--text);
+        padding: 9px 16px 5px;
+        color: var(--text-bright);
         text-align: center;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.35;
+        font-family: var(--mono);
+        font-size: 12.5px;
+        font-weight: 500;
+        line-height: 1.45;
         word-break: break-word;
         overflow-wrap: anywhere;
       }}
       .ns-if-labels {{
         display: flex;
         justify-content: space-between;
-        padding: 4px 10px 6px;
+        padding: 4px 10px 7px;
       }}
       .ns-if-yes,
       .ns-if-no {{
-        font-size: 11px;
+        font-size: 10px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.04em;
+        letter-spacing: 0.06em;
       }}
-      .ns-if-yes {{
-        color: #2c6a1c;
+      .ns-if-yes {{ color: var(--green); }}
+      .ns-if-no  {{ color: var(--red);   }}
+
+      .ns-branches {{
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        background: var(--surface-2);
       }}
-      .ns-if-no {{
-        color: #a53a4b;
+      .ns-branches-single {{ grid-template-columns: 1fr; }}
+      .ns-branch {{
+        min-width: 0;
+        border-left: 1px solid var(--border);
+        background: var(--surface-2);
+      }}
+      .ns-branch:first-child {{ border-left: 0; }}
+      .ns-branch-title {{
+        padding: 5px 10px;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-3);
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }}
+      .ns-cases {{ background: var(--surface-2); }}
+      .case {{ border-top: 1px solid var(--border); }}
+      .case:first-child {{ border-top: 0; }}
+      .ns-catches {{ border-top: 1px solid var(--border); }}
+
+      .empty {{
+        color: var(--muted);
+        font-style: italic;
+        font-size: 12px;
+        background: var(--surface-3);
+      }}
+      .ns-note {{
+        color: var(--muted);
+        font-family: var(--mono);
+        font-size: 11px;
+        font-style: italic;
+        background: var(--note-fill);
+        border-top: 1px solid var(--border);
+        padding: 5px 10px;
       }}
       .empty-file {{
-        margin: 0;
         padding: 24px;
+        color: var(--muted);
       }}
+
       @media (max-width: 800px) {{
-        body {{ padding: 16px; }}
-        .viewer-body {{ padding: 10px; }}
-        .function-body {{ padding: 8px; }}
+        body {{ padding: 12px; }}
+        .viewer-body {{ padding: 8px; }}
+        .function-body {{ padding: 6px; }}
         .ns-node {{ min-width: 0; }}
         .ns-branches {{ grid-template-columns: 1fr; }}
         .ns-branch {{
           border-left: 0;
-          border-top: 1px solid var(--line);
+          border-top: 1px solid var(--border);
         }}
-        .ns-branch:first-child {{
-          border-top: 0;
-        }}
+        .ns-branch:first-child {{ border-top: 0; }}
       }}
     </style>
   </head>
   <body>
     <div class="viewer">
-      <div class="titlebar">Swifta NSD Viewer</div>
+      <div class="titlebar">
+        <div class="titlebar-icon"></div>
+        <span class="titlebar-text">Swifta · NSD Viewer</span>
+      </div>
       <div class="toolbar">
-        <div class="toolbar-label">Nassi-Shneiderman Control Flow</div>
-        <div class="toolbar-path">{escape(diagram.source_location)}</div>
+        <span class="toolbar-label">Nassi-Shneiderman</span>
+        <code class="toolbar-path">{escape(diagram.source_location)}</code>
       </div>
       <main class="viewer-body">{sections}</main>
     </div>
