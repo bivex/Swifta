@@ -22,6 +22,36 @@ from swifta.domain.ports import NassiDiagramRenderer
 
 
 class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
+    def _depth_badge(self, i: int) -> str:
+        if i == 0:
+            return ""
+        if i <= 20:
+            return f" {chr(0x2460 + i - 1)}"
+        if i <= 35:
+            return f" {chr(0x3251 + i - 21)}"
+        return f" {chr(0x32B1 + i - 36)}"
+
+    def _depth_css(self) -> str:
+        colors = ["blue", "green", "purple", "teal", "amber"]
+        top_rules = []
+        body_rules = []
+        for i in range(51):
+            c = colors[i % 5]
+            top_rules.append(f"      .ns-if-depth-{i} .ns-if-top {{ background: var(--{c}-dim); color: var(--{c}); }}")
+            if i >= 1:
+                # Rotate hue for diagonal gradient: each depth shifts by 15deg
+                hue_yes = (120 + i * 15) % 360
+                hue_no = (340 + i * 15) % 360
+                body_rules.append(
+                    f"      .ns-if-depth-{i} .ns-if-body {{\n"
+                    f"        background: linear-gradient(168deg, "
+                    f"hsl({hue_yes}, 30%, 9%) 0%, hsl({hue_yes}, 30%, 9%) 48.5%, "
+                    f"var(--border) 49%, var(--border) 50%, "
+                    f"hsl({hue_no}, 35%, 8%) 50.5%, hsl({hue_no}, 35%, 8%) 100%);\n"
+                    f"      }}"
+                )
+        return "\n".join(top_rules) + "\n\n      /* Depth-coded diagonal body gradient */\n" + "\n".join(body_rules)
+
     def render(self, diagram: ControlFlowDiagram) -> str:
         sections = "".join(self._render_function(function) for function in diagram.functions)
         if not sections:
@@ -316,26 +346,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-if-yes {{ color: var(--green); }}
       .ns-if-no  {{ color: var(--red);   }}
 
-      /* Depth-coded if-cap headers: 0=blue 1=green 2=purple 3=teal 4=amber */
-      .ns-if-depth-0 .ns-if-top {{ background: var(--blue-dim);   color: var(--blue);   }}
-      .ns-if-depth-1 .ns-if-top {{ background: var(--green-dim);  color: var(--green);  }}
-      .ns-if-depth-2 .ns-if-top {{ background: var(--purple-dim); color: var(--purple); }}
-      .ns-if-depth-3 .ns-if-top {{ background: var(--teal-dim);   color: var(--teal);   }}
-      .ns-if-depth-4 .ns-if-top {{ background: var(--amber-dim);  color: var(--amber);  }}
-
-      /* Depth-coded diagonal body gradient */
-      .ns-if-depth-1 .ns-if-body {{
-        background: linear-gradient(168deg, #0e1f10 0%, #0e1f10 48.5%, var(--border) 49%, var(--border) 50%, #1e0e18 50.5%, #1e0e18 100%);
-      }}
-      .ns-if-depth-2 .ns-if-body {{
-        background: linear-gradient(168deg, #14102a 0%, #14102a 48.5%, var(--border) 49%, var(--border) 50%, #2a1014 50.5%, #2a1014 100%);
-      }}
-      .ns-if-depth-3 .ns-if-body {{
-        background: linear-gradient(168deg, #0c1e25 0%, #0c1e25 48.5%, var(--border) 49%, var(--border) 50%, #1e0c14 50.5%, #1e0c14 100%);
-      }}
-      .ns-if-depth-4 .ns-if-body {{
-        background: linear-gradient(168deg, #221600 0%, #221600 48.5%, var(--border) 49%, var(--border) 50%, #220010 50.5%, #220010 100%);
-      }}
+      /* Depth-coded if-cap headers (0-50, cycling blue→green→purple→teal→amber) */
+{self._depth_css()}
 
       .ns-branches {{
         display: grid;
@@ -546,12 +558,10 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(title)
         return f'<div class="ns-header" aria-label="{escaped}">{escaped}</div>'
 
-    _DEPTH_BADGES = ("", " ①", " ②", " ③", " ④")
-
     def _render_if_cap(self, condition: str, *, depth: int = 0) -> str:
         escaped = escape(condition)
-        d = min(depth, 4)
-        badge = self._DEPTH_BADGES[d]
+        d = min(depth, 50)
+        badge = self._depth_badge(d)
         return (
             f'<div class="ns-if-cap ns-if-depth-{d}" aria-label="If {escaped}">'
             f'<div class="ns-if-top">if{badge}</div>'
