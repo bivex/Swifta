@@ -200,6 +200,52 @@ class Worker {
     assert diagram.functions[0].steps[0].__class__.__name__ == "IfFlowStep"
 
 
+def test_control_flow_extractor_summarizes_large_if_without_statement_parse(monkeypatch) -> None:
+    _ensure_generated_parser()
+    extractor = AntlrSwiftControlFlowExtractor()
+
+    def _unexpected_statement_parse(*args, **kwargs):
+        raise AssertionError("unexpected statement parse for oversized if")
+
+    monkeypatch.setattr(control_flow_module, "parse_statement_text", _unexpected_statement_parse)
+
+    repeated_then = "\n".join(
+        f'            let primaryLine{i} = "value-{i}"'
+        for i in range(40)
+    )
+    repeated_else = "\n".join(
+        f'            let fallbackLine{i} = "fallback-{i}"'
+        for i in range(40)
+    )
+    source = SourceUnit(
+        identifier=SourceUnitId("large-if"),
+        location="large-if.swift",
+        content=f"""
+class GiantLayout {{
+    func render(_ value: Int) {{
+        if value > 0 {{
+{repeated_then}
+            return
+        }} else {{
+{repeated_else}
+            return
+        }}
+    }}
+}}
+""".strip(),
+    )
+
+    diagram = extractor.extract(source)
+
+    assert len(diagram.functions) == 1
+    assert len(diagram.functions[0].steps) == 1
+    step = diagram.functions[0].steps[0]
+    assert isinstance(step, IfFlowStep)
+    assert step.condition == "value > 0"
+    assert step.then_steps
+    assert step.else_steps
+
+
 def test_nassi_cli_writes_html_file(tmp_path: Path) -> None:
     _ensure_generated_parser()
     output_path = tmp_path / "control_flow.html"

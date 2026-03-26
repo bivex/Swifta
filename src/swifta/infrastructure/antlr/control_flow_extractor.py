@@ -72,6 +72,14 @@ class _FunctionSlice:
     body_text: str
 
 
+_MAX_STRUCTURED_PARSE_CHARS = 1400
+_MAX_STRUCTURED_PARSE_TOKENS = 220
+_MAX_STRUCTURED_PARSE_LINES = 24
+_MAX_EXPANDED_CLOSURE_CHARS = 1800
+_MAX_EXPANDED_CLOSURE_LINES = 36
+_SUMMARY_LABEL_LIMIT = 96
+
+
 class AntlrSwiftControlFlowExtractor(SwiftControlFlowExtractor):
     def __init__(self) -> None:
         self._generated = load_generated_types()
@@ -358,6 +366,9 @@ def _extract_lightweight_steps(
             lexer_type,
         )
         if closure_body is not None:
+            if _should_summarize_code_block(closure_body):
+                steps.extend(_summarize_code_block_steps(closure_body, lexer_type))
+                continue
             nested_steps = _extract_lightweight_steps(
                 closure_body,
                 generated,
@@ -381,6 +392,9 @@ def _extract_lightweight_steps(
             lexer_type,
         )
         if trailing_body is not None:
+            if _should_summarize_code_block(trailing_body):
+                steps.extend(_summarize_code_block_steps(trailing_body, lexer_type))
+                continue
             nested_steps = _extract_lightweight_steps(
                 trailing_body,
                 generated,
@@ -398,6 +412,16 @@ def _extract_lightweight_steps(
             continue
 
         if tokens[0].type in structured_starters:
+            if _should_summarize_structured_statement(statement_text, tokens):
+                steps.append(
+                    _build_summarized_structured_step(
+                        statement_text,
+                        tokens,
+                        base_offset,
+                        lexer_type,
+                    )
+                )
+                continue
             parse_result = parse_statement_text(statement_text, generated)
             visitor = _build_control_flow_visitor(
                 visitor_type,
@@ -411,6 +435,325 @@ def _extract_lightweight_steps(
         steps.append(ActionFlowStep(_compact_source_text(statement_text.strip().removesuffix(";"))))
 
     return tuple(steps)
+
+
+def _should_summarize_structured_statement(
+    statement_text: str,
+    tokens: tuple[object, ...],
+) -> bool:
+    return (
+        len(statement_text) > _MAX_STRUCTURED_PARSE_CHARS
+        or len(tokens) > _MAX_STRUCTURED_PARSE_TOKENS
+        or statement_text.count("\n") > _MAX_STRUCTURED_PARSE_LINES
+    )
+
+
+def _should_summarize_code_block(body_text: str) -> bool:
+    return (
+        len(body_text) > _MAX_EXPANDED_CLOSURE_CHARS
+        or body_text.count("\n") > _MAX_EXPANDED_CLOSURE_LINES
+    )
+
+
+def _summarize_code_block_steps(
+    body_text: str,
+    lexer_type: object,
+) -> tuple[ControlFlowStep, ...]:
+    statement_spans = _split_top_level_statement_spans(body_text, lexer_type)
+    if statement_spans is None:
+        label = _compact_label_text(body_text.strip().strip("{}"))
+        return (ActionFlowStep(label),) if label else ()
+
+    steps: list[ControlFlowStep] = []
+    structured_starters = _structured_token_types(lexer_type)
+
+    for statement_text, tokens, base_offset in statement_spans:
+        if not tokens:
+            continue
+        if tokens[0].type in structured_starters:
+            steps.append(
+                _build_summarized_structured_step(
+                    statement_text,
+                    tokens,
+                    base_offset,
+                    lexer_type,
+                )
+            )
+            continue
+        label = _compact_label_text(statement_text.strip().removesuffix(";"))
+        if label:
+            steps.append(ActionFlowStep(label))
+
+    return tuple(steps)
+
+
+def _build_summarized_structured_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    if not tokens:
+        return ActionFlowStep(_compact_label_text(statement_text))
+
+    starter = tokens[0].text
+    if starter == "if":
+        return _build_summarized_if_step(statement_text, tokens, base_offset, lexer_type)
+    if starter == "guard":
+        return _build_summarized_guard_step(statement_text, tokens, base_offset, lexer_type)
+    if starter == "for":
+        return _build_summarized_for_in_step(statement_text, tokens, base_offset, lexer_type)
+    if starter == "while":
+        return _build_summarized_while_step(statement_text, tokens, base_offset, lexer_type)
+    if starter == "repeat":
+        return _build_summarized_repeat_while_step(statement_text, tokens, base_offset, lexer_type)
+    if starter == "defer":
+        return _build_summarized_defer_step(statement_text, tokens, base_offset, lexer_type)
+    return ActionFlowStep(_summarize_structured_header(statement_text, tokens, base_offset, lexer_type))
+
+
+def _build_summarized_if_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    condition = _compact_label_text(
+        _slice_token_text(statement_text, tokens, base_offset, 1, open_index - 1)
+    )
+    then_steps = _summarize_code_block_steps(
+        _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+        lexer_type,
+    )
+
+    else_steps: tuple[ControlFlowStep, ...] = ()
+    else_index = close_index + 1
+    if else_index < len(tokens) and tokens[else_index].text == "else":
+        next_index = else_index + 1
+        if next_index < len(tokens) and tokens[next_index].text == "if":
+            nested_text = _slice_token_text(
+                statement_text,
+                tokens,
+                base_offset,
+                next_index,
+                len(tokens) - 1,
+            )
+            else_steps = (
+                _build_summarized_structured_step(
+                    nested_text,
+                    tokens[next_index:],
+                    tokens[next_index].start,
+                    lexer_type,
+                ),
+            )
+        else:
+            else_block = _find_top_level_code_block(tokens, next_index, lexer_type)
+            if else_block is not None:
+                else_open, else_close = else_block
+                else_steps = _summarize_code_block_steps(
+                    _slice_token_text(
+                        statement_text,
+                        tokens,
+                        base_offset,
+                        else_open,
+                        else_close,
+                    ),
+                    lexer_type,
+                )
+
+    return IfFlowStep(
+        condition=condition or "condition",
+        then_steps=then_steps,
+        else_steps=else_steps,
+    )
+
+
+def _build_summarized_guard_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    condition = _compact_label_text(
+        _slice_token_text(statement_text, tokens, base_offset, 1, open_index - 1)
+    )
+    return GuardFlowStep(
+        condition=condition or "condition",
+        else_steps=_summarize_code_block_steps(
+            _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+            lexer_type,
+        ),
+    )
+
+
+def _build_summarized_for_in_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    header = _compact_label_text(
+        _slice_token_text(statement_text, tokens, base_offset, 1, open_index - 1)
+    )
+    return ForInFlowStep(
+        header=header or "item in collection",
+        body_steps=_summarize_code_block_steps(
+            _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+            lexer_type,
+        ),
+    )
+
+
+def _build_summarized_while_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    condition = _compact_label_text(
+        _slice_token_text(statement_text, tokens, base_offset, 1, open_index - 1)
+    )
+    return WhileFlowStep(
+        condition=condition or "condition",
+        body_steps=_summarize_code_block_steps(
+            _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+            lexer_type,
+        ),
+    )
+
+
+def _build_summarized_repeat_while_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    while_index = close_index + 1
+    condition = ""
+    if while_index < len(tokens) and tokens[while_index].text == "while":
+        condition = _compact_label_text(
+            _slice_token_text(
+                statement_text,
+                tokens,
+                base_offset,
+                while_index + 1,
+                len(tokens) - 1,
+            ).removesuffix(";")
+        )
+    return RepeatWhileFlowStep(
+        condition=condition or "condition",
+        body_steps=_summarize_code_block_steps(
+            _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+            lexer_type,
+        ),
+    )
+
+
+def _build_summarized_defer_step(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> ControlFlowStep:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return ActionFlowStep(_compact_label_text(statement_text.strip().removesuffix(";")))
+
+    open_index, close_index = block_range
+    return DeferFlowStep(
+        body_steps=_summarize_code_block_steps(
+            _slice_token_text(statement_text, tokens, base_offset, open_index, close_index),
+            lexer_type,
+        )
+    )
+
+
+def _summarize_structured_header(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> str:
+    block_range = _find_top_level_code_block(tokens, 1, lexer_type)
+    if block_range is None:
+        return _compact_label_text(statement_text.strip().removesuffix(";"))
+    open_index, _ = block_range
+    return _compact_label_text(
+        _slice_token_text(statement_text, tokens, base_offset, 0, open_index - 1)
+    )
+
+
+def _find_top_level_code_block(
+    tokens: tuple[object, ...],
+    start_index: int,
+    lexer_type: object,
+) -> tuple[int, int] | None:
+    paren_depth = 0
+    square_depth = 0
+
+    for index in range(start_index, len(tokens)):
+        token = tokens[index]
+        if token.type == lexer_type.LPAREN:
+            paren_depth += 1
+        elif token.type == lexer_type.RPAREN:
+            paren_depth = max(paren_depth - 1, 0)
+        elif token.text == "[":
+            square_depth += 1
+        elif token.text == "]":
+            square_depth = max(square_depth - 1, 0)
+        elif token.type == lexer_type.LCURLY and paren_depth == square_depth == 0:
+            close_index = _find_matching_brace(tokens, index, lexer_type)
+            if close_index is not None:
+                return index, close_index
+            return None
+
+    return None
+
+
+def _slice_token_text(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    start_index: int,
+    end_index: int,
+) -> str:
+    if start_index < 0 or end_index < start_index or end_index >= len(tokens):
+        return ""
+    start = tokens[start_index].start - base_offset
+    end = tokens[end_index].stop + 1 - base_offset
+    return statement_text[start:end]
+
+
+def _compact_label_text(text: str, *, limit: int = _SUMMARY_LABEL_LIMIT) -> str:
+    compact = re.sub(r"\s+", " ", text).strip()
+    if len(compact) <= limit:
+        return compact
+    return f"{compact[: limit - 1]}..."
 
 
 def _split_top_level_statement_spans(
