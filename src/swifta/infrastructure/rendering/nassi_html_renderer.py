@@ -48,6 +48,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                     f"hsl({hue_yes}, 30%, 9%) 0%, hsl({hue_yes}, 30%, 9%) 48.5%, "
                     f"var(--border) 49%, var(--border) 50%, "
                     f"hsl({hue_no}, 35%, 8%) 50.5%, hsl({hue_no}, 35%, 8%) 100%);\n"
+                    f"        overflow: hidden;\n"
                     f"      }}"
                 )
         return "\n".join(top_rules) + "\n\n      /* Depth-coded diagonal body gradient */\n" + "\n".join(body_rules)
