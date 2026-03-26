@@ -478,7 +478,7 @@ class TestIfDepthRendering:
         # Check for badges (there's at least one if in the test fixture)
         # The fixture has nested ifs in score() function
 
-    def test_nested_if_layout_css_stays_fluid_inside_branches(self) -> None:
+    def test_nested_if_layout_css_can_expand_horizontally_for_deep_branches(self) -> None:
         renderer = HtmlNassiDiagramRenderer()
         diagram = ControlFlowDiagram(
             source_location="nested.swift",
@@ -513,22 +513,23 @@ class TestIfDepthRendering:
         css = renderer.render(diagram).split("<style>", 1)[1].split("</style>", 1)[0]
 
         assert re.search(
-            r"\.function-body > \.ns-sequence \{[^}]*width: 100%;[^}]*min-width: 580px;",
+            r"\.viewer \{[^}]*width: max-content;[^}]*min-width: min\(1200px, calc\(100vw - 48px\)\);",
             css,
             re.DOTALL,
         )
         assert re.search(
-            r"\.ns-node \{[^}]*width: 100%;[^}]*min-width: 0;",
+            r"\.function-body > \.ns-sequence \{[^}]*width: max-content;[^}]*min-width: 100%;",
             css,
             re.DOTALL,
         )
         assert re.search(
-            r"\.ns-branches \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*min-width: 0;",
+            r"\.ns-sequence \{[^}]*width: max-content;[^}]*min-width: 100%;",
             css,
             re.DOTALL,
         )
         assert re.search(
-            r"\.ns-branch \{[^}]*width: 100%;[^}]*min-width: 0;",
+            r"\.ns-branches \{[^}]*grid-template-columns: repeat\(2, max-content\);[^}]*width: max-content;[^}]*min-width: 100%;",
             css,
             re.DOTALL,
         )
+        assert "580px" not in css
