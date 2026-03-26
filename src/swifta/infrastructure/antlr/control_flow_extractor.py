@@ -406,7 +406,6 @@ def _split_top_level_statement_spans(
     brace_depth = 1
     paren_depth = 0
     square_depth = 0
-    angle_depth = 0
     statement_start_index: int | None = None
 
     for index in range(1, close_index):
@@ -422,10 +421,6 @@ def _split_top_level_statement_spans(
             square_depth += 1
         elif token.text == "]":
             square_depth = max(square_depth - 1, 0)
-        elif token.text == "<":
-            angle_depth += 1
-        elif token.text == ">":
-            angle_depth = max(angle_depth - 1, 0)
         elif token.type == lexer_type.LCURLY:
             brace_depth += 1
         elif token.type == lexer_type.RCURLY:
@@ -437,13 +432,13 @@ def _split_top_level_statement_spans(
         if (
             token.text == ";"
             and brace_depth == 1
-            and paren_depth == square_depth == angle_depth == 0
+            and paren_depth == square_depth == 0
         ):
             at_statement_end = True
         elif (
             next_token is not None
             and brace_depth == 1
-            and paren_depth == square_depth == angle_depth == 0
+            and paren_depth == square_depth == 0
             and next_token.text not in {"else", "catch"}
             and next_token.line > token.line
         ):
