@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -10,7 +11,9 @@ from swifta.application.control_flow import (
 )
 from swifta.domain.control_flow import (
     ActionFlowStep,
+    ControlFlowDiagram,
     ForInFlowStep,
+    FunctionControlFlow,
     GuardFlowStep,
     IfFlowStep,
 )
@@ -474,3 +477,58 @@ class TestIfDepthRendering:
         assert "ns-if-depth-" in html
         # Check for badges (there's at least one if in the test fixture)
         # The fixture has nested ifs in score() function
+
+    def test_nested_if_layout_css_stays_fluid_inside_branches(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        diagram = ControlFlowDiagram(
+            source_location="nested.swift",
+            functions=(
+                FunctionControlFlow(
+                    name="processComplexData",
+                    signature="func processComplexData(_ data: [Item]) -> Result",
+                    container=None,
+                    steps=(
+                        IfFlowStep(
+                            condition="item.isValid",
+                            then_steps=(
+                                IfFlowStep(
+                                    condition="item.hasPriority",
+                                    then_steps=(ActionFlowStep("handleUrgent(item)"),),
+                                    else_steps=(ActionFlowStep("handleNormal(item)"),),
+                                ),
+                            ),
+                            else_steps=(
+                                IfFlowStep(
+                                    condition="item.canRecover",
+                                    then_steps=(ActionFlowStep("recover(item)"),),
+                                    else_steps=(ActionFlowStep("discard(item)"),),
+                                ),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        css = renderer.render(diagram).split("<style>", 1)[1].split("</style>", 1)[0]
+
+        assert re.search(
+            r"\.function-body > \.ns-sequence \{[^}]*width: 100%;[^}]*min-width: 580px;",
+            css,
+            re.DOTALL,
+        )
+        assert re.search(
+            r"\.ns-node \{[^}]*width: 100%;[^}]*min-width: 0;",
+            css,
+            re.DOTALL,
+        )
+        assert re.search(
+            r"\.ns-branches \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);[^}]*min-width: 0;",
+            css,
+            re.DOTALL,
+        )
+        assert re.search(
+            r"\.ns-branch \{[^}]*width: 100%;[^}]*min-width: 0;",
+            css,
+            re.DOTALL,
+        )

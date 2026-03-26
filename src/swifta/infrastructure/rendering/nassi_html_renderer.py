@@ -203,10 +203,16 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         background: var(--bg);
         overflow-x: auto;
       }}
+      .function-body > .ns-sequence {{
+        width: 100%;
+        min-width: 580px;
+      }}
       /* ── Node sequence ── */
       .ns-sequence {{
         display: flex;
         flex-direction: column;
+        width: 100%;
+        min-width: 0;
       }}
       .ns-sequence > .ns-node + .ns-node,
       .ns-cases > .case + .case,
@@ -214,7 +220,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         margin-top: -1px;
       }}
       .ns-node {{
-        min-width: 580px;
+        width: 100%;
+        min-width: 0;
         border: 1px solid var(--border);
         border-radius: 3px;
         background: var(--action-fill);
@@ -349,6 +356,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         grid-auto-flow: column;
         grid-auto-columns: minmax(min-content, max-content);
         background: var(--bg);
+        min-width: 0;
         overflow-x: auto;
       }}
       .ns-switch-case-col {{
@@ -386,12 +394,14 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
       .ns-branches {{
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         background: var(--surface-2);
+        min-width: 0;
       }}
       .ns-branches-single {{ grid-template-columns: 1fr; }}
       .ns-branch {{
-        min-width: 200px;
+        width: 100%;
+        min-width: 0;
         border-left: 2px solid var(--border);
         background: var(--surface-2);
       }}
@@ -435,7 +445,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         body {{ padding: 12px; }}
         .viewer-body {{ padding: 8px; }}
         .function-body {{ padding: 6px; }}
-        .ns-node {{ min-width: 0; }}
+        .function-body > .ns-sequence {{ min-width: 0; }}
         .ns-branches {{ grid-template-columns: 1fr; }}
         .ns-branch {{
           border-left: 0;
