@@ -301,13 +301,19 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         stroke: var(--border);
         stroke-width: 1;
       }}
+      .ns-if-condition-fo {{
+        overflow: hidden;
+      }}
       .ns-if-condition-text {{
         font-family: var(--mono);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 500;
-        fill: var(--text-bright);
+        color: var(--text-bright);
+        text-align: center;
         word-break: break-word;
         overflow-wrap: anywhere;
+        line-height: 1.3;
+        padding: 4px 8px;
       }}
       .ns-if-label-yes {{
         font-family: var(--mono);
@@ -542,17 +548,19 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         escaped = escape(condition)
         d = min(depth, 50)
         badge = self._depth_badge(d)
-        # SVG height: 80px (triangle 50px + labels 30px)
+        # SVG with foreignObject for proper text wrapping
         return (
             f'<div class="ns-if-cap ns-if-depth-{d}" aria-label="If {escaped}">'
-            f'<svg class="ns-if-svg" viewBox="0 0 400 80" preserveAspectRatio="none">'
+            '<svg class="ns-if-svg" viewBox="0 0 400 80" preserveAspectRatio="xMidYMid meet">'
             f'<polygon points="0,0 400,0 200,50" class="ns-if-triangle ns-if-depth-{d}-triangle"/>'
-            f'<text x="200" y="28" text-anchor="middle" class="ns-if-condition-text">{badge} {escaped}</text>'
+            f'<foreignObject x="20" y="5" width="360" height="45" class="ns-if-condition-fo">'
+            f'<div xmlns="http://www.w3.org/1999/xhtml" class="ns-if-condition-text">{badge} {escaped}</div>'
+            '</foreignObject>'
             f'<line x1="0" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
             f'<line x1="400" y1="50" x2="200" y2="80" class="ns-if-diagonal ns-if-depth-{d}-diagonal"/>'
             f'<text x="100" y="72" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
             f'<text x="300" y="72" text-anchor="middle" class="ns-if-label-no">No</text>'
-            f'</svg>'
+            '</svg>'
             "</div>"
         )
 
