@@ -42,6 +42,41 @@ Today the system supports:
 * **Architecture**
   * keeping parser infrastructure behind ports so the application layer stays independent from ANTLR, filesystem, and CLI details
 
+## Diagram Features
+
+The Nassi-Shneiderman diagrams include:
+
+* **Visual clarity**
+  * Classic NS triangles for if-blocks with Yes/No labels
+  * Horizontal dividers for case blocks with side-by-side columns
+  * Color-coded block types (loops=blue, guards=orange, switches=teal, etc.)
+  * JetBrains Mono monospace font for code readability
+
+* **Depth awareness**
+  * 50 depth levels with cycling colors (blue → green → purple → teal → amber)
+  * Unicode circled badges (①-⑩, ⑪-⑳, ㉑-㉟, ㊱-㊿) on nested conditionals
+  * Background tinting for deeper nesting levels
+
+* **Dark theme**
+  * Tokyo Night-inspired color palette optimized for code readability
+  * Proper contrast ratios for comfortable viewing
+  - Responsive layout for different screen sizes
+
+* **Smart parsing**
+  * Trailing closure expansion for functional chains
+  * Autoreleasepool unwrapping for Objective-C interop
+  * Fast path for simple function bodies
+
+### Screenshots
+
+**Basic control flow** — loops, guards, and switch/case blocks:
+
+![Basic NS diagram](docs/screenshots/nassi_diagram.png)
+
+**Nested conditionals** — depth-coded badges and colors for up to 50 nesting levels:
+
+![Nested depth diagram](docs/screenshots/nested_depth.png)
+
 ## Architecture
 
 The codebase is split into four explicit layers:
