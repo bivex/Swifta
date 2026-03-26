@@ -298,6 +298,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         display: flex;
         flex-direction: column;
         border-bottom: 1px solid var(--border);
+        overflow: hidden;
       }}
       .ns-if-top {{
         padding: 5px 10px;
@@ -319,6 +320,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
           var(--no-fill)   50.5%,
           var(--no-fill)  100%
         );
+        overflow: hidden;
       }}
       .ns-if-condition {{
         padding: 9px 16px 5px;
@@ -332,10 +334,17 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         overflow-wrap: anywhere;
       }}
       .ns-if-labels {{
-        display: flex;
-        justify-content: space-between;
-        padding: 4px 10px 7px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        padding: 4px 0 7px;
       }}
+      .ns-if-label-yes,
+      .ns-if-label-no {{
+        padding: 0 10px;
+        text-align: center;
+      }}
+      .ns-if-label-yes {{ text-align: left; }}
+      .ns-if-label-no {{ text-align: right; }}
       .ns-if-yes,
       .ns-if-no {{
         font-size: 10px;
@@ -568,8 +577,8 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             '<div class="ns-if-body">'
             f'<div class="ns-if-condition">{escaped}</div>'
             '<div class="ns-if-labels">'
-            '<span class="ns-if-yes">Yes</span>'
-            '<span class="ns-if-no">No</span>'
+            '<div class="ns-if-label-yes"><span class="ns-if-yes">Yes</span></div>'
+            '<div class="ns-if-label-no"><span class="ns-if-no">No</span></div>'
             "</div>"
             "</div>"
             "</div>"
