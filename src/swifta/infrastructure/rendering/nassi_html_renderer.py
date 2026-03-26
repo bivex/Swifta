@@ -54,77 +54,89 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Nassi-Shneiderman Control Flow</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
       :root {{
-        /* Palette — Tokyo Night-inspired dark */
-        --bg:          #13141f;
-        --surface:     #1a1b2e;
-        --surface-2:   #1f2335;
-        --surface-3:   #24283b;
-        --border:      #2e3354;
-        --border-soft: #1e2240;
-        --text:        #c0caf5;
-        --text-bright: #e2e8ff;
-        --muted:       #565f89;
-        --shadow:      0 8px 32px rgba(0, 0, 0, 0.55);
+        /* Palette — editor-first dark */
+        --bg:          #0a0f18;
+        --bg-accent:   #10182a;
+        --surface:     #111827;
+        --surface-2:   #172131;
+        --surface-3:   #1c2940;
+        --surface-4:   #233452;
+        --border:      #2b3b59;
+        --border-strong: #3f5378;
+        --border-soft: #182338;
+        --text:        #cfd8f6;
+        --text-bright: #f4f7ff;
+        --muted:       #8e9bbb;
+        --shadow:      0 24px 72px rgba(3, 8, 18, 0.56);
 
         /* Accent colours */
-        --blue:        #7aa2f7;
-        --blue-dim:    #3d59a1;
-        --green:       #9ece6a;
-        --green-dim:   #1a3320;
-        --red:         #f7768e;
-        --red-dim:     #2d1420;
-        --orange:      #ff9e64;
-        --orange-dim:  #2d1e10;
-        --teal:        #2ac3de;
-        --teal-dim:    #0e2830;
-        --purple:      #bb9af7;
-        --purple-dim:  #201830;
-        --amber:       #e0af68;
-        --amber-dim:   #2a1e08;
+        --blue:        #82aaff;
+        --blue-dim:    #243b69;
+        --green:       #a6da95;
+        --green-dim:   #163628;
+        --red:         #ff93a9;
+        --red-dim:     #371925;
+        --orange:      #ffb86b;
+        --orange-dim:  #37230f;
+        --teal:        #56d4dd;
+        --teal-dim:    #11343b;
+        --purple:      #c4a7ff;
+        --purple-dim:  #2a1d41;
+        --amber:       #f1ca7a;
+        --amber-dim:   #39290f;
 
         /* Block fills */
-        --loop-fill:   #141d2e;
-        --switch-fill: #0f1e20;
-        --guard-fill:  #1e1508;
-        --do-fill:     #16141e;
-        --defer-fill:  #1e1a0a;
-        --yes-fill:    #0f1e12;
-        --no-fill:     #1e0f14;
+        --loop-fill:   #132033;
+        --switch-fill: #102529;
+        --guard-fill:  #23190c;
+        --do-fill:     #1a1624;
+        --defer-fill:  #241d0d;
+        --yes-fill:    #102217;
+        --no-fill:     #251019;
         --action-fill: var(--surface-2);
-        --note-fill:   #141622;
+        --note-fill:   #101720;
 
         /* Code font */
         --mono: "JetBrains Mono", "Fira Code", "Cascadia Code", "SF Mono", "Menlo", monospace;
-        --ui:   "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+        --ui:   "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
       }}
       * {{ box-sizing: border-box; margin: 0; padding: 0; }}
       body {{
         font-family: var(--ui);
         font-size: 14px;
         color: var(--text);
-        background: var(--bg);
+        background:
+          radial-gradient(circle at top, rgba(130, 170, 255, 0.12), transparent 28%),
+          linear-gradient(180deg, var(--bg) 0%, #0c121d 100%);
         padding: 24px;
         min-height: 100vh;
         overflow-x: auto;
+        color-scheme: dark;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }}
       /* ── Viewer shell ── */
       .viewer {{
         width: max-content;
         min-width: min(1200px, calc(100vw - 48px));
         margin: 0 auto;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--surface);
+        border: 1px solid var(--border-strong);
+        border-radius: 14px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+          var(--surface);
         box-shadow: var(--shadow);
         overflow: hidden;
       }}
       .titlebar {{
         padding: 10px 16px;
-        background: var(--surface-3);
-        border-bottom: 1px solid var(--border);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0)),
+          var(--surface-3);
+        border-bottom: 1px solid var(--border-strong);
         display: flex;
         align-items: center;
         gap: 10px;
@@ -137,15 +149,17 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         flex-shrink: 0;
       }}
       .titlebar-text {{
-        font-size: 13px;
+        font-size: 13.5px;
         font-weight: 600;
         color: var(--text-bright);
-        letter-spacing: 0.02em;
+        letter-spacing: 0.01em;
       }}
       .toolbar {{
-        padding: 8px 16px;
+        padding: 9px 16px;
         border-bottom: 1px solid var(--border-soft);
-        background: var(--surface);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0)),
+          var(--surface);
         display: flex;
         flex-wrap: wrap;
         gap: 8px 14px;
@@ -157,54 +171,62 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--blue);
-        background: rgba(122, 162, 247, 0.1);
-        border: 1px solid rgba(122, 162, 247, 0.25);
-        border-radius: 3px;
-        padding: 2px 7px;
+        background: rgba(130, 170, 255, 0.14);
+        border: 1px solid rgba(130, 170, 255, 0.3);
+        border-radius: 999px;
+        padding: 3px 8px;
         white-space: nowrap;
       }}
       .toolbar-path {{
         font-family: var(--mono);
-        font-size: 11.5px;
+        font-size: 12px;
         color: var(--muted);
         overflow-wrap: anywhere;
       }}
       /* ── Viewer body ── */
       .viewer-body {{
         padding: 16px;
-        background: var(--bg);
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0) 180px),
+          var(--bg);
       }}
       /* ── Function panel ── */
       .function-panel {{
         margin-bottom: 16px;
         border: 1px solid var(--border);
-        border-radius: 6px;
+        border-radius: 10px;
+        background: rgba(10, 15, 24, 0.72);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
         overflow: hidden;
       }}
       .function-panel:last-child {{ margin-bottom: 0; }}
       .function-head {{
-        padding: 10px 14px;
-        background: var(--surface-3);
-        border-bottom: 1px solid var(--border);
+        padding: 12px 16px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01)),
+          var(--surface-3);
+        border-bottom: 1px solid var(--border-strong);
       }}
       .function-title {{
-        font-size: 14px;
+        font-size: 15px;
         font-weight: 600;
         color: var(--text-bright);
         line-height: 1.3;
       }}
       .function-signature {{
-        margin-top: 3px;
+        margin-top: 5px;
         font-family: var(--mono);
-        font-size: 11.5px;
-        line-height: 1.5;
+        font-size: 12px;
+        line-height: 1.6;
         color: var(--muted);
         overflow-wrap: anywhere;
         word-break: break-word;
       }}
       .function-body {{
-        padding: 10px;
-        background: var(--bg);
+        padding: 12px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0)),
+          rgba(7, 11, 18, 0.84);
       }}
       .function-body > .ns-sequence {{
         width: max-content;
@@ -224,21 +246,24 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-node {{
         border: 1px solid var(--border);
-        border-radius: 3px;
+        border-radius: 6px;
         background: var(--action-fill);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
       }}
       /* ── Block headers/footers ── */
       .ns-header,
       .ns-footer,
       .case-title {{
-        padding: 6px 10px;
-        background: var(--blue-dim);
-        color: var(--blue);
+        padding: 7px 12px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0)),
+          var(--blue-dim);
+        color: var(--text-bright);
         font-family: var(--mono);
         font-size: 12px;
         font-weight: 500;
         line-height: 1.4;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--border-strong);
         overflow-wrap: anywhere;
         word-break: break-word;
       }}
@@ -250,15 +275,20 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       .ns-label,
       .empty,
       .ns-note {{
-        padding: 5px 10px;
-        background: var(--action-fill);
+        padding: 8px 12px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0)),
+          var(--action-fill);
       }}
       .action-text {{
         display: block;
         font-family: var(--mono);
-        font-size: 12.5px;
-        line-height: 1.6;
-        color: var(--text);
+        font-size: 13px;
+        line-height: 1.72;
+        color: var(--text-bright);
+        letter-spacing: -0.01em;
+        font-variant-ligatures: none;
+        tab-size: 2;
         white-space: pre-wrap;
         overflow-wrap: anywhere;
       }}
@@ -340,13 +370,15 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
 
       /* ── Switch/case (classic NS diagram) ── */
       .ns-switch-header {{
-        padding: 8px 12px;
-        background: var(--teal-dim);
-        color: var(--teal);
+        padding: 9px 12px;
+        background:
+          linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0)),
+          var(--teal-dim);
+        color: var(--text-bright);
         font-family: var(--mono);
         font-size: 12px;
         font-weight: 500;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--border-strong);
         overflow-wrap: anywhere;
         word-break: break-word;
       }}
@@ -368,13 +400,13 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         border-right: none;
       }}
       .ns-switch-case-value {{
-        padding: 8px 12px;
-        background: var(--surface-2);
+        padding: 9px 12px;
+        background: rgba(16, 24, 39, 0.86);
         color: var(--teal);
         font-family: var(--mono);
         font-size: 11px;
         font-weight: 600;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--border-strong);
         text-align: center;
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -435,14 +467,14 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
       }}
       .ns-branch:first-child {{ border-left: 0; }}
       .ns-branch-title {{
-        padding: 5px 10px;
+        padding: 7px 12px;
         border-bottom: 1px solid var(--border);
-        background: var(--surface-3);
+        background: rgba(18, 26, 41, 0.92);
         color: var(--muted);
-        font-size: 10px;
+        font-size: 10.5px;
         font-weight: 600;
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
       }}
       .ns-cases {{ background: var(--surface-2); }}
       .case {{ border-top: 1px solid var(--border); }}
@@ -453,7 +485,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         color: var(--muted);
         font-style: italic;
         font-size: 12px;
-        background: var(--surface-3);
+        background: rgba(20, 28, 41, 0.92);
       }}
       .ns-note {{
         color: var(--muted);
@@ -462,7 +494,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         font-style: italic;
         background: var(--note-fill);
         border-top: 1px solid var(--border);
-        padding: 5px 10px;
+        padding: 8px 12px;
       }}
       .empty-file {{
         padding: 24px;
