@@ -56,7 +56,7 @@ def test_nassi_service_builds_html_document() -> None:
     assert "score" in document.function_names
     assert "MathBox.normalize" in document.function_names
     assert "While total &gt; 100" in document.html
-    assert "Switch total" in document.html
+    assert "switch total" in document.html
     assert "Swifta" in document.html
 
 

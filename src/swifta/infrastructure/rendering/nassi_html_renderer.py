@@ -332,6 +332,61 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
         letter-spacing: 0.06em;
       }}
 
+      /* ── Switch/case (classic NS diagram with SVG) ── */
+      .ns-switch-svg {{
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 80px;
+      }}
+      .ns-switch-triangle {{
+        fill: var(--teal-dim);
+        stroke: var(--teal);
+        stroke-width: 1;
+      }}
+      .ns-switch-diagonal {{
+        stroke: var(--border);
+        stroke-width: 1;
+      }}
+      .ns-switch-condition-fo {{
+        overflow: hidden;
+      }}
+      .ns-switch-condition-text {{
+        font-family: var(--mono);
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--text-bright);
+        text-align: center;
+        word-break: break-word;
+        overflow-wrap: anywhere;
+        line-height: 1.3;
+        padding: 4px 8px;
+      }}
+      .ns-switch-case-label {{
+        font-family: var(--mono);
+        font-size: 10px;
+        font-weight: 700;
+        fill: var(--teal);
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }}
+      .ns-switch-cases {{
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(min-content, max-content);
+        background: var(--surface-2);
+        overflow-x: auto;
+        border-top: 1px solid var(--border);
+      }}
+      .ns-switch-case {{
+        border-right: 1px solid var(--border);
+        background: var(--surface-2);
+        min-width: 120px;
+      }}
+      .ns-switch-case:last-child {{
+        border-right: 0;
+      }}
+
       /* Depth-coded if-cap triangles and diagonals (0-50, cycling blue→green→purple→teal→amber) */
 {self._depth_css()}
 
@@ -488,14 +543,7 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
                 "</div>"
             )
         if isinstance(step, SwitchFlowStep):
-            cases = "".join(self._render_case(case) for case in step.cases)
-            cases_markup = cases or '<div class="empty">No cases.</div>'
-            return (
-                '<div class="ns-node ns-switch">'
-                f"{self._render_header(f'Switch {step.expression}')}"
-                f'<div class="ns-cases">{cases_markup}</div>'
-                "</div>"
-            )
+            return self._render_switch(step, depth=depth)
         if isinstance(step, DoCatchFlowStep):
             catches = "".join(
                 self._render_single_body(
@@ -561,6 +609,69 @@ class HtmlNassiDiagramRenderer(NassiDiagramRenderer):
             f'<text x="100" y="72" text-anchor="middle" class="ns-if-label-yes">Yes</text>'
             f'<text x="300" y="72" text-anchor="middle" class="ns-if-label-no">No</text>'
             '</svg>'
+            "</div>"
+        )
+
+    def _render_switch(self, step: SwitchFlowStep, *, depth: int) -> str:
+        case_count = len(step.cases)
+        if case_count == 0:
+            return (
+                '<div class="ns-node ns-switch">'
+                f"{self._render_header(f'Switch {step.expression}')}"
+                '<div class="empty">No cases.</div>'
+                "</div>"
+            )
+
+        # Dynamic SVG width: min 120px per case
+        min_column_width = 120
+        svg_width = max(400, case_count * min_column_width)
+        svg_height = 80
+        column_width = svg_width / case_count
+        triangle_height = 50
+
+        # Build case branches
+        cases_html = []
+        for i, case in enumerate(step.cases):
+            label = self._normalize_case_label(case.label.strip())
+            cases_html.append(
+                f'<div class="ns-switch-case" style="min-width: {min_column_width}px" aria-label="{escape(label)}">'
+                f"{self._render_sequence(case.steps, depth=depth + 1)}"
+                "</div>"
+            )
+
+        # Build SVG with multiple diagonal lines
+        diagonal_lines = []
+        case_labels = []
+        for i in range(case_count):
+            x_center = (i + 0.5) * column_width
+            # Diagonal from top edge to bottom center of column
+            x_top_left = i * column_width
+            x_top_right = (i + 1) * column_width
+            diagonal_lines.append(
+                f'<line x1="{x_top_left}" y1="{triangle_height}" x2="{x_center}" y2="{svg_height}" class="ns-switch-diagonal"/>'
+            )
+            diagonal_lines.append(
+                f'<line x1="{x_top_right}" y1="{triangle_height}" x2="{x_center}" y2="{svg_height}" class="ns-switch-diagonal"/>'
+            )
+            # Case label
+            case_labels.append(
+                f'<text x="{x_center}" y="72" text-anchor="middle" class="ns-switch-case-label">{escape(self._normalize_case_label(step.cases[i].label.strip()))}</text>'
+            )
+
+        d = min(depth, 50)
+        badge = self._depth_badge(d)
+
+        return (
+            f'<div class="ns-node ns-switch ns-if-depth-{d}" style="--case-count: {case_count}">'
+            f'<svg class="ns-switch-svg" viewBox="0 0 {svg_width} {svg_height}" preserveAspectRatio="xMidYMid meet">'
+            f'<polygon points="0,0 {svg_width},0 {svg_width / 2},{triangle_height}" class="ns-switch-triangle ns-if-depth-{d}-triangle"/>'
+            f'<foreignObject x="20" y="5" width="{svg_width - 40}" height="45" class="ns-switch-condition-fo">'
+            f'<div xmlns="http://www.w3.org/1999/xhtml" class="ns-switch-condition-text">{badge} switch {escape(step.expression)}</div>'
+            '</foreignObject>'
+            f'{"".join(diagonal_lines)}'
+            f'{"".join(case_labels)}'
+            f'</svg>'
+            f'<div class="ns-switch-cases">{"".join(cases_html)}</div>'
             "</div>"
         )
 
