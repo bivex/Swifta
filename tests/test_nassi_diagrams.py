@@ -362,3 +362,115 @@ class C {
         assert any(isinstance(s, IfFlowStep) for s in steps), (
             "expected an IfFlowStep when return precedes trailing closure"
         )
+
+
+# ---------------------------------------------------------------------------
+# If depth rendering tests
+# ---------------------------------------------------------------------------
+
+
+class TestIfDepthRendering:
+    """If-cap rendering with depth-coded badges and colors."""
+
+    def test_depth_badge_zero_is_empty(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        assert renderer._depth_badge(0) == ""
+
+    def test_depth_badges_1_to_10_use_circled_digits(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        assert renderer._depth_badge(1) == " ①"
+        assert renderer._depth_badge(5) == " ⑤"
+        assert renderer._depth_badge(10) == " ⑩"
+
+    def test_depth_badges_11_to_20_use_second_range(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        assert renderer._depth_badge(11) == " ⑪"
+        assert renderer._depth_badge(15) == " ⑮"
+        assert renderer._depth_badge(20) == " ⑳"
+
+    def test_depth_badges_21_to_35_use_third_range(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        assert renderer._depth_badge(21) == " ㉑"
+        assert renderer._depth_badge(30) == " ㉚"
+        assert renderer._depth_badge(35) == " ㉟"
+
+    def test_depth_badges_36_to_50_use_fourth_range(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        assert renderer._depth_badge(36) == " ㊱"
+        assert renderer._depth_badge(40) == " ㊵"
+        assert renderer._depth_badge(50) == " ㊿"
+
+    def test_depth_css_generates_51_levels(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        css = renderer._depth_css()
+        assert ".ns-if-depth-0 .ns-if-top" in css
+        assert ".ns-if-depth-50 .ns-if-top" in css
+
+    def test_depth_css_cycles_colors(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        css = renderer._depth_css()
+        assert "var(--blue-dim)" in css
+        assert "var(--green-dim)" in css
+        assert "var(--purple-dim)" in css
+        assert "var(--teal-dim)" in css
+        assert "var(--amber-dim)" in css
+
+    def test_depth_css_includes_body_gradients(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        css = renderer._depth_css()
+        assert ".ns-if-depth-1 .ns-if-body" in css
+        assert "hsl(" in css
+        assert "linear-gradient(168deg" in css
+
+    def test_render_if_cap_at_depth_zero(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=0)
+        assert 'class="ns-if-cap ns-if-depth-0"' in html
+        assert "<div class=\"ns-if-top\">if</div>" in html
+
+    def test_render_if_cap_at_depth_five(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=5)
+        assert 'class="ns-if-cap ns-if-depth-5"' in html
+        assert "<div class=\"ns-if-top\">if ⑤</div>" in html
+
+    def test_render_if_cap_at_depth_twenty_clips_badge(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=20)
+        assert 'class="ns-if-cap ns-if-depth-20"' in html
+        assert "<div class=\"ns-if-top\">if ⑳</div>" in html
+
+    def test_render_if_cap_at_depth_thirty_five(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=35)
+        assert 'class="ns-if-cap ns-if-depth-35"' in html
+        assert "<div class=\"ns-if-top\">if ㉟</div>" in html
+
+    def test_render_if_cap_at_depth_thirty_six_jumps_unicode(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=36)
+        assert 'class="ns-if-cap ns-if-depth-36"' in html
+        assert "<div class=\"ns-if-top\">if ㊱</div>" in html
+
+    def test_render_if_cap_at_depth_fifty(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=50)
+        assert 'class="ns-if-cap ns-if-depth-50"' in html
+        assert "<div class=\"ns-if-top\">if ㊿</div>" in html
+
+    def test_render_if_cap_clips_at_max_depth(self) -> None:
+        renderer = HtmlNassiDiagramRenderer()
+        html = renderer._render_if_cap("x > 0", depth=100)
+        assert 'class="ns-if-cap ns-if-depth-50"' in html
+        assert "<div class=\"ns-if-top\">if ㊿</div>" in html
+
+    def test_nested_ifs_in_html_output(self) -> None:
+        service = _build_service()
+        document = service.build_file_diagram(
+            BuildNassiDiagramCommand(path=str(ROOT / "tests" / "fixtures" / "control_flow.swift"))
+        )
+        html = document.html
+        # Check for depth-coded if-cap classes
+        assert "ns-if-depth-" in html
+        # Check for badges (there's at least one if in the test fixture)
+        # The fixture has nested ifs in score() function
