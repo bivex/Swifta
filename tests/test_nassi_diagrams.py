@@ -8,6 +8,12 @@ from swifta.application.control_flow import (
     BuildNassiDirectoryCommand,
     NassiDiagramService,
 )
+from swifta.domain.control_flow import (
+    ActionFlowStep,
+    ForInFlowStep,
+    GuardFlowStep,
+    IfFlowStep,
+)
 from swifta.domain.model import SourceUnit, SourceUnitId
 from swifta.infrastructure.antlr import control_flow_extractor as control_flow_module
 from swifta.infrastructure.antlr.control_flow_extractor import AntlrSwiftControlFlowExtractor
@@ -249,3 +255,110 @@ def test_nassi_dir_cli_writes_html_bundle(tmp_path: Path) -> None:
     assert (output_dir / "control_flow.nassi.html").exists()
     assert (output_dir / "invalid.nassi.html").exists()
     assert "Swifta NSD Index" in (output_dir / "index.html").read_text(encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# Trailing closure expansion
+# ---------------------------------------------------------------------------
+
+
+def _extract_steps(swift_code: str):
+    """Build a diagram from a Swift snippet and return the first function's steps."""
+    _ensure_generated_parser()
+    extractor = AntlrSwiftControlFlowExtractor()
+    source = SourceUnit(
+        identifier=SourceUnitId("trailing-closure"),
+        location="trailing-closure.swift",
+        content=swift_code.strip(),
+    )
+    diagram = extractor.extract(source)
+    assert len(diagram.functions) >= 1, "expected at least one function"
+    return diagram.functions[0].steps
+
+
+class TestTrailingClosureExpansion:
+    """Trailing closures should have their bodies expanded inline."""
+
+    def test_map_with_if_and_return(self) -> None:
+        steps = _extract_steps("""
+class C {
+    func f(windowFrames: [(Int, CGRect)]) {
+        let corrections = windowFrames.map { (window, currentFrame) -> (Int, CGRect, Bool) in
+            var corrected = currentFrame
+            if corrected.minX < 0 { corrected.origin.x = 0 }
+            return (window, corrected, true)
+        }
+    }
+}
+""")
+        step_types = [type(s) for s in steps]
+        assert ActionFlowStep not in step_types or len(steps) > 1, (
+            "map trailing closure collapsed to a single action"
+        )
+        assert any(isinstance(s, IfFlowStep) for s in steps), (
+            "expected an IfFlowStep from the closure body"
+        )
+
+    def test_foreach_with_if_and_for(self) -> None:
+        steps = _extract_steps("""
+class C {
+    func f(items: [Int]) {
+        items.forEach { item in
+            if item > 0 { print(item) }
+            for i in 0..<item { print(i) }
+        }
+    }
+}
+""")
+        step_types = [type(s) for s in steps]
+        assert any(isinstance(s, IfFlowStep) for s in steps), (
+            "expected an IfFlowStep from forEach closure body"
+        )
+        assert any(isinstance(s, ForInFlowStep) for s in steps), (
+            "expected a ForInFlowStep from forEach closure body"
+        )
+
+    def test_reduce_with_guard(self) -> None:
+        steps = _extract_steps("""
+class C {
+    func f(values: [Double]) {
+        let total = values.reduce(0.0) { sum, val in
+            guard val > 0 else { return sum }
+            return sum + val
+        }
+    }
+}
+""")
+        assert any(isinstance(s, GuardFlowStep) for s in steps), (
+            "expected a GuardFlowStep from reduce closure body"
+        )
+
+    def test_chained_filter_map_expands_last_closure(self) -> None:
+        steps = _extract_steps("""
+class C {
+    func f(items: [Int]) {
+        let result = items.filter { $0 > 0 }.map { item in
+            if item > 10 { return item * 2 }
+            return item
+        }
+    }
+}
+""")
+        assert any(isinstance(s, IfFlowStep) for s in steps), (
+            "expected an IfFlowStep from chained .map trailing closure"
+        )
+
+    def test_return_before_trailing_closure(self) -> None:
+        steps = _extract_steps("""
+class C {
+    func f(items: [Int]) {
+        return items.map { item in
+            if item > 0 { return item }
+            return 0
+        }
+    }
+}
+""")
+        assert any(isinstance(s, IfFlowStep) for s in steps), (
+            "expected an IfFlowStep when return precedes trailing closure"
+        )

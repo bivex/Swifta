@@ -374,6 +374,29 @@ def _extract_lightweight_steps(
             steps.extend(nested_steps)
             continue
 
+        trailing_body = _extract_trailing_closure_body(
+            statement_text,
+            tokens,
+            base_offset,
+            lexer_type,
+        )
+        if trailing_body is not None:
+            nested_steps = _extract_lightweight_steps(
+                trailing_body,
+                generated,
+                visitor_type,
+                lexer_type,
+            )
+            if nested_steps is None:
+                parse_result = parse_code_block_text(trailing_body, generated)
+                visitor = _build_control_flow_visitor(
+                    visitor_type,
+                    _ExtractorContext(token_stream=parse_result.token_stream),
+                )()
+                nested_steps = visitor._extract_code_block(parse_result.tree)
+            steps.extend(nested_steps)
+            continue
+
         if tokens[0].type in structured_starters:
             parse_result = parse_statement_text(statement_text, generated)
             visitor = _build_control_flow_visitor(
@@ -504,6 +527,49 @@ def _extract_autoreleasepool_body(
 
     return statement_text[
         tokens[open_index].start - base_offset : tokens[close_index].stop + 1 - base_offset
+    ]
+
+
+def _extract_trailing_closure_body(
+    statement_text: str,
+    tokens: tuple[object, ...],
+    base_offset: int,
+    lexer_type: object,
+) -> str | None:
+    """Return the ``{ ... }`` text of a trailing closure, or ``None``.
+
+    A trailing closure is detected when:
+    - The last token is ``RCURLY``
+    - The first token is NOT a structured keyword (if/guard/for/while/...)
+    - The matching ``LCURLY`` for that final ``RCURLY`` is at index > 0
+    """
+    if len(tokens) < 3:
+        return None
+
+    if tokens[-1].type != lexer_type.RCURLY:
+        return None
+
+    structured = _structured_token_types(lexer_type)
+    if tokens[0].type in structured:
+        return None
+
+    # Walk backwards from the end to find the matching LCURLY.
+    depth = 0
+    open_index: int | None = None
+    for i in range(len(tokens) - 1, -1, -1):
+        if tokens[i].type == lexer_type.RCURLY:
+            depth += 1
+        elif tokens[i].type == lexer_type.LCURLY:
+            depth -= 1
+            if depth == 0:
+                open_index = i
+                break
+
+    if open_index is None or open_index == 0:
+        return None
+
+    return statement_text[
+        tokens[open_index].start - base_offset : tokens[-1].stop + 1 - base_offset
     ]
 
 
