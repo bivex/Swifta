@@ -40,7 +40,9 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "parse-file":
             report = _build_parse_service().parse_file(ParseFileCommand(path=args.path))
         elif args.command == "parse-dir":
-            report = _build_parse_service().parse_directory(ParseDirectoryCommand(root_path=args.path))
+            report = _build_parse_service().parse_directory(
+                ParseDirectoryCommand(root_path=args.path)
+            )
         elif args.command == "nassi-file":
             document = _build_nassi_service().build_file_diagram(
                 BuildNassiDiagramCommand(path=args.path)
@@ -209,7 +211,7 @@ def _render_directory_index(
             "<tr>"
             f'<td><a href="{escape(diagram.relative_output_path)}">{escape(diagram.relative_source_path)}</a></td>'
             f"<td>{diagram.function_count}</td>"
-            f"<td>{escape(', '.join(diagram.function_names) if diagram.function_names else 'No functions found')}</td>"
+            f"<td>{escape(', '.join(diagram.function_names) if diagram.function_names else '—')}</td>"
             "</tr>"
         )
         for diagram in written_diagrams
@@ -223,126 +225,198 @@ def _render_directory_index(
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Swifta NSD Index</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
       :root {{
-        --line: #22364d;
-        --page: #d9e0e7;
-        --panel: #f6f1e1;
-        --panel-2: #fffdf8;
-        --text: #112033;
-        --muted: #5f6e7c;
-        --blue: #1676dc;
-        --blue-dark: #0b57ae;
-        --shadow: 0 18px 40px rgba(21, 34, 52, 0.18);
+        --bg:          #f8fafc;
+        --surface:     #ffffff;
+        --surface-2:   #f1f5f9;
+        --border:      #e2e8f0;
+        --border-strong: #cbd5e1;
+        --text:        #0f172a;
+        --text-muted:  #64748b;
+        --primary:     #2563eb;
+        --primary-dark: #1d4ed8;
+        --shadow-sm:   0 1px 2px rgba(0, 0, 0, 0.05);
+        --shadow-md:   0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+        --radius:      12px;
+        --font-ui: "IBM Plex Sans", -apple-system, "Segoe UI", system-ui, sans-serif;
+        --font-mono: "JetBrains Mono", "Fira Code", "SFMono-Regular", monospace;
       }}
-      * {{ box-sizing: border-box; }}
+
+      * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
       body {{
         margin: 0;
-        padding: 24px;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        padding: 40px 24px;
+        font-family: var(--font-ui);
+        font-size: 15px;
         color: var(--text);
-        background: linear-gradient(180deg, #e3e8ee 0%, var(--page) 100%);
+        background: linear-gradient(180deg, #f1f5f9 0%, var(--bg) 100%);
+        min-height: 100vh;
+        -webkit-font-smoothing: antialiased;
       }}
-      .window {{
-        max-width: 1120px;
+
+      .container {{
+        max-width: 1000px;
         margin: 0 auto;
-        border: 2px solid var(--line);
-        background: var(--panel);
-        box-shadow: var(--shadow);
       }}
-      .titlebar {{
-        padding: 8px 14px;
-        color: #ffffff;
-        font-size: 18px;
-        font-weight: 700;
-        background: linear-gradient(180deg, #3394ff 0%, var(--blue) 48%, var(--blue-dark) 100%);
+
+      .header {{
+        margin-bottom: 28px;
       }}
-      .body {{
-        padding: 16px;
+
+      .header h1 {{
+        font-size: 28px;
+        font-weight: 600;
+        color: var(--text);
+        margin: 0 0 6px;
+        letter-spacing: -0.02em;
       }}
-      .meta {{
-        margin: 0 0 14px;
-        color: var(--muted);
-        font-family: "IBM Plex Mono", "SFMono-Regular", monospace;
+
+      .header p {{
+        color: var(--text-muted);
+        font-size: 14px;
+        margin: 0;
+        font-family: var(--font-mono);
+      }}
+
+      .card {{
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }}
+
+      .card-header {{
+        padding: 16px 20px;
+        background: linear-gradient(180deg, var(--surface-2) 0%, var(--surface) 100%);
+        border-bottom: 1px solid var(--border);
+        font-family: var(--font-mono);
         font-size: 12px;
-        overflow-wrap: anywhere;
+        font-weight: 500;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
       }}
+
+      .card-body {{
+        padding: 4px;
+      }}
+
+      .table-wrapped {{
+        overflow-x: auto;
+      }}
+
       table {{
         width: 100%;
         border-collapse: collapse;
-        background: var(--panel-2);
+        font-size: 14px;
       }}
-      th, td {{
-        padding: 10px 12px;
-        border: 1px solid var(--line);
+
+      th {{
         text-align: left;
+        padding: 12px 16px;
+        font-weight: 600;
+        color: var(--text-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.07em;
+        border-bottom: 1px solid var(--border);
+        background: var(--surface-2);
+      }}
+
+      td {{
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--border);
         vertical-align: top;
       }}
-      th {{
-        color: #ffffff;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        background: linear-gradient(180deg, var(--blue) 0%, var(--blue-dark) 100%);
+
+      tr:last-child td {{
+        border-bottom: 0;
       }}
-      td:nth-child(2) {{
-        width: 110px;
-        text-align: center;
-        white-space: nowrap;
+
+      tr:hover td {{
+        background: var(--surface-2);
       }}
+
       a {{
-        color: #0f58ad;
+        color: var(--primary);
         text-decoration: none;
-        font-weight: 700;
+        font-weight: 500;
+        transition: color 0.15s;
       }}
+
       a:hover {{
+        color: var(--primary-dark);
         text-decoration: underline;
       }}
-      @media (max-width: 800px) {{
-        body {{ padding: 12px; }}
-        .body {{ padding: 10px; }}
-        table, thead, tbody, tr, th, td {{
-          display: block;
-        }}
-        thead {{
-          display: none;
-        }}
-        tr {{
-          margin-bottom: 12px;
-          border: 1px solid var(--line);
-          background: var(--panel-2);
-        }}
-        td {{
-          border: 0;
-          border-top: 1px solid var(--line);
-        }}
-        td:first-child {{
-          border-top: 0;
-        }}
-        td:nth-child(2) {{
-          width: auto;
-          text-align: left;
-        }}
+
+      .count {{
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 28px;
+        height: 28px;
+        font-size: 13px;
+        font-weight: 600;
+        font-family: var(--font-mono);
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--text-muted);
+      }}
+
+      .count.zero {{
+        color: #94a3b8;
+        background: #f1f5f9;
+      }}
+
+      .names {{
+        font-family: var(--font-mono);
+        font-size: 13px;
+        line-height: 1.6;
+        color: var(--text-muted);
+      }}
+
+      .empty {{
+        color: var(--text-muted);
+        font-style: italic;
+      }}
+
+      @media (max-width: 640px) {{
+        body {{ padding: 20px 16px; }}
+        .header h1 {{ font-size: 22px; }}
+        th, td {{ padding: 10px 12px; }}
       }}
     </style>
   </head>
   <body>
-    <div class="window">
-      <div class="titlebar">Swifta NSD Index</div>
-      <div class="body">
-        <p class="meta">{escape(root_path)}</p>
-        <table>
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Functions</th>
-              <th>Names</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows}
-          </tbody>
-        </table>
+    <div class="container">
+      <div class="header">
+        <h1>Nassi-Shneiderman Diagrams</h1>
+        <p>{escape(root_path)}</p>
+      </div>
+      <div class="card">
+        <div class="card-header">{len(written_diagrams)} file(s)</div>
+        <div class="card-body">
+          <div class="table-wrapped">
+            <table>
+              <thead>
+                <tr>
+                  <th>Source File</th>
+                  <th style="width: 120px;">Functions</th>
+                  <th>Functions Found</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </body>
