@@ -185,7 +185,7 @@ def _scan_lightweight_structure(
     func_depth = 0
 
     pending_type_container: str | None = None
-    pending_func: bool = False
+    pending_func_or_prop: bool = False
 
     i = 0
     n = len(tokens)
@@ -195,16 +195,18 @@ def _scan_lightweight_structure(
         txt = t.text
 
         if txt == "{":
+            parent_type_depth = len(type_containers)
             if pending_type_container is not None:
                 type_containers.append(pending_type_container)
                 pending_type_container = None
-            if pending_func:
+                pending_func_or_prop = False
+            elif pending_func_or_prop:
                 func_depth += 1
-                pending_func = False
+                pending_func_or_prop = False
             elif func_depth > 0:
                 func_depth += 1
 
-            brace_depths.append((len(type_containers), func_depth))
+            brace_depths.append((parent_type_depth, func_depth))
             i += 1
             continue
         elif txt == "}":
@@ -213,12 +215,10 @@ def _scan_lightweight_structure(
                 while len(type_containers) > target_type_depth:
                     type_containers.pop()
                 func_depth = target_func_depth
-                if func_depth > 0 and (not brace_depths or brace_depths[-1][1] < func_depth):
-                    func_depth -= 1
             i += 1
             continue
 
-        # Ignore local variables inside function bodies
+        # Ignore local variables inside function bodies or computed properties
         if func_depth > 0 and txt in ("var", "let"):
             i += 1
             continue
@@ -276,7 +276,9 @@ def _scan_lightweight_structure(
                         signature=sig,
                     )
                 )
-                pending_func = True
+                if k < n and tokens[k].text == "{":
+                    pending_func_or_prop = True
+                i = k - 1 if k < n and tokens[k].text == "{" else k
             else:
                 j = i + 1
                 while j < n and (
@@ -323,8 +325,17 @@ def _scan_lightweight_structure(
                         StructuralElementKind.EXTENSION,
                     ):
                         pending_type_container = name
-                    elif kind == StructuralElementKind.FUNCTION:
-                        pending_func = True
+                        pending_func_or_prop = False
+                    elif kind in (
+                        StructuralElementKind.FUNCTION,
+                        StructuralElementKind.VARIABLE,
+                        StructuralElementKind.CONSTANT,
+                    ):
+                        k = j
+                        while k < n and tokens[k].text not in ("{", "}", ";"):
+                            k += 1
+                        if k < n and tokens[k].text == "{":
+                            pending_func_or_prop = True
                     i = j
         i += 1
 

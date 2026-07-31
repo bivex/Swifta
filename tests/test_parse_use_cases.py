@@ -172,6 +172,44 @@ struct Model {
     assert "focusedPanel" not in init_elem.signature
 
 
+def test_protocol_requirements_and_computed_properties_scope_resolution(tmp_path: Path, monkeypatch) -> None:
+    from swifta.domain.model import SourceUnit, SourceUnitId
+    from swifta.infrastructure.antlr import parser_adapter
+
+    parser = AntlrSwiftSyntaxParser(default_timeout_seconds=0.05)
+    source_unit = SourceUnit(
+        identifier=SourceUnitId("proto.swift"),
+        location=str(tmp_path / "proto.swift"),
+        content="""
+protocol Service {
+    func fetch() async throws -> Data
+}
+
+struct Impl: Service {
+    let storage: Data
+    var computed: Int {
+        var localVal = 1
+        return localVal
+    }
+}
+""".strip(),
+    )
+
+    def _mock_slow_parse(*args, **kwargs):
+        raise RuntimeError("Force fallback")
+
+    monkeypatch.setattr(parser_adapter, "parse_source_text", _mock_slow_parse)
+
+    outcome = parser.parse(source_unit, timeout_seconds=0.05)
+    elements = outcome.structural_elements
+    names = [e.name for e in elements]
+    containers = [e.container for e in elements]
+
+    assert names == ["Service", "fetch", "Impl", "storage", "computed"]
+    assert containers == [None, "Service", None, "Impl", "Impl"]
+    assert "localVal" not in names
+
+
 def test_cli_supports_timeout_flag() -> None:
     _ensure_generated_parser()
     result = subprocess.run(
