@@ -180,9 +180,12 @@ def _scan_lightweight_structure(
     tokens = [t for t in raw_tokens if t.type != -1 and t.text.strip()]
 
     elements: list[StructuralElement] = []
-    containers: list[str] = []
-    brace_depths: list[int] = []
-    pending_container: str | None = None
+    type_containers: list[str] = []
+    brace_depths: list[tuple[int, int]] = []
+    func_depth = 0
+
+    pending_type_container: str | None = None
+    pending_func: bool = False
 
     i = 0
     n = len(tokens)
@@ -192,17 +195,36 @@ def _scan_lightweight_structure(
         txt = t.text
 
         if txt == "{":
-            if pending_container is not None:
-                containers.append(pending_container)
-                pending_container = None
-            brace_depths.append(len(containers))
+            if pending_type_container is not None:
+                type_containers.append(pending_type_container)
+                pending_type_container = None
+            if pending_func:
+                func_depth += 1
+                pending_func = False
+            elif func_depth > 0:
+                func_depth += 1
+
+            brace_depths.append((len(type_containers), func_depth))
             i += 1
             continue
         elif txt == "}":
             if brace_depths:
-                target_depth = brace_depths.pop()
-                while len(containers) > target_depth:
-                    containers.pop()
+                target_type_depth, target_func_depth = brace_depths.pop()
+                while len(type_containers) > target_type_depth:
+                    type_containers.pop()
+                func_depth = target_func_depth
+                if func_depth > 0 and (not brace_depths or brace_depths[-1][1] < func_depth):
+                    func_depth -= 1
+            i += 1
+            continue
+
+        # Ignore local variables inside function bodies
+        if func_depth > 0 and txt in ("var", "let"):
+            i += 1
+            continue
+
+        # Ignore member references like Double.init, .init(...)
+        if txt in ("init", "deinit", "subscript") and i > 0 and tokens[i - 1].text == ".":
             i += 1
             continue
 
@@ -237,7 +259,7 @@ def _scan_lightweight_structure(
                 name = txt
                 line = t.line
                 column = t.column
-                container = ".".join(containers) if containers else None
+                container = ".".join(type_containers) if type_containers else None
                 sig_tokens = [txt]
                 k = i + 1
                 while k < n and tokens[k].text not in ("{", "}", ";"):
@@ -254,6 +276,7 @@ def _scan_lightweight_structure(
                         signature=sig,
                     )
                 )
+                pending_func = True
             else:
                 j = i + 1
                 while j < n and (
@@ -269,7 +292,7 @@ def _scan_lightweight_structure(
                     name = tokens[j].text
                     line = t.line
                     column = t.column
-                    container = ".".join(containers) if containers else None
+                    container = ".".join(type_containers) if type_containers else None
 
                     prefix = "actor" if txt == "actor" else kind.value
                     sig = f"{prefix} {name}"
@@ -299,7 +322,9 @@ def _scan_lightweight_structure(
                         StructuralElementKind.PROTOCOL,
                         StructuralElementKind.EXTENSION,
                     ):
-                        pending_container = name
+                        pending_type_container = name
+                    elif kind == StructuralElementKind.FUNCTION:
+                        pending_func = True
                     i = j
         i += 1
 
