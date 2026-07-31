@@ -9,16 +9,19 @@ import threading
 from typing import Any
 
 from swifta.domain.model import (
+    DiagnosticSeverity,
     GrammarVersion,
     ParseOutcome,
     ParseStatistics,
     SourceUnit,
     StructuralElement,
     StructuralElementKind,
+    SyntaxDiagnostic,
 )
 from swifta.domain.ports import SwiftSyntaxParser
 from swifta.infrastructure.antlr.runtime import (
     ANTLR_GRAMMAR_VERSION,
+    GeneratedParserTypes,
     load_generated_types,
     parse_source_text,
 )
@@ -58,7 +61,7 @@ class _timeout_context:
 
 
 class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
-    def __init__(self, default_timeout_seconds: float | None = 8.0) -> None:
+    def __init__(self, default_timeout_seconds: float | None = 1.5) -> None:
         self._generated = load_generated_types()
         self.default_timeout_seconds = default_timeout_seconds
 
@@ -96,14 +99,150 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                     elapsed_ms=elapsed_ms,
                 ),
             )
-        except Exception as error:
-            elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
-            return ParseOutcome.technical_failure(
-                source_unit=source_unit,
-                grammar_version=self.grammar_version,
-                message=str(error),
-                elapsed_ms=elapsed_ms,
-            )
+        except Exception:
+            # Fallback to lightweight token scanner when ANTLR AST parse fails or times out
+            try:
+                fallback_elements = _scan_lightweight_structure(source_unit.content, self._generated)
+                elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
+                diagnostics = (
+                    SyntaxDiagnostic(
+                        severity=DiagnosticSeverity.WARNING,
+                        message="parsed via lightweight declaration scanner fallback",
+                        line=0,
+                        column=0,
+                    ),
+                )
+                return ParseOutcome.success(
+                    source_unit=source_unit,
+                    grammar_version=self.grammar_version,
+                    diagnostics=diagnostics,
+                    structural_elements=fallback_elements,
+                    statistics=ParseStatistics(
+                        token_count=0,
+                        structural_element_count=len(fallback_elements),
+                        diagnostic_count=1,
+                        elapsed_ms=elapsed_ms,
+                    ),
+                )
+            except Exception as fallback_error:
+                elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
+                return ParseOutcome.technical_failure(
+                    source_unit=source_unit,
+                    grammar_version=self.grammar_version,
+                    message=str(fallback_error),
+                    elapsed_ms=elapsed_ms,
+                )
+
+
+def _scan_lightweight_structure(
+    content: str,
+    generated_types: GeneratedParserTypes,
+) -> tuple[StructuralElement, ...]:
+    from antlr4 import CommonTokenStream, InputStream
+
+    lexer = generated_types.lexer_type(InputStream(content))
+    token_stream = CommonTokenStream(lexer)
+    token_stream.fill()
+    tokens = [t for t in token_stream.tokens if t.type != -1 and t.text.strip()]
+
+    elements: list[StructuralElement] = []
+    containers: list[str] = []
+    brace_depths: list[int] = []
+    pending_container: str | None = None
+
+    i = 0
+    n = len(tokens)
+
+    while i < n:
+        t = tokens[i]
+        txt = t.text
+
+        if txt == "{":
+            if pending_container is not None:
+                containers.append(pending_container)
+                pending_container = None
+            brace_depths.append(len(containers))
+            i += 1
+            continue
+        elif txt == "}":
+            if brace_depths:
+                target_depth = brace_depths.pop()
+                while len(containers) > target_depth:
+                    containers.pop()
+            i += 1
+            continue
+
+        kind = None
+        if txt == "import":
+            kind = StructuralElementKind.IMPORT
+        elif txt == "typealias":
+            kind = StructuralElementKind.TYPE_ALIAS
+        elif txt == "struct":
+            kind = StructuralElementKind.STRUCT
+        elif txt in ("class", "actor"):
+            kind = StructuralElementKind.CLASS
+        elif txt == "enum":
+            kind = StructuralElementKind.ENUM
+        elif txt == "protocol":
+            kind = StructuralElementKind.PROTOCOL
+        elif txt == "extension":
+            kind = StructuralElementKind.EXTENSION
+        elif txt == "func":
+            kind = StructuralElementKind.FUNCTION
+        elif txt == "var":
+            kind = StructuralElementKind.VARIABLE
+        elif txt == "let":
+            kind = StructuralElementKind.CONSTANT
+
+        if kind is not None:
+            j = i + 1
+            while j < n and (
+                tokens[j].text.startswith("@")
+                or tokens[j].text in (
+                    "public", "private", "fileprivate", "internal", "open",
+                    "final", "static", "override", "mutating", "nonmutating",
+                    "async", "optional", "required", "lazy", "indirect",
+                )
+            ):
+                j += 1
+            if j < n and tokens[j].text not in ("{", "}", ";", "("):
+                name = tokens[j].text
+                line = t.line
+                column = t.column
+                container = ".".join(containers) if containers else None
+
+                sig = f"{kind.value} {name}"
+                if kind == StructuralElementKind.FUNCTION:
+                    sig_tokens = []
+                    k = j
+                    while k < n and tokens[k].text not in ("{", ";"):
+                        sig_tokens.append(tokens[k].text)
+                        k += 1
+                    sig = "func " + " ".join(sig_tokens)
+
+                elements.append(
+                    StructuralElement(
+                        kind=kind,
+                        name=name,
+                        line=line,
+                        column=column,
+                        container=container,
+                        signature=sig,
+                    )
+                )
+
+                if kind in (
+                    StructuralElementKind.STRUCT,
+                    StructuralElementKind.CLASS,
+                    StructuralElementKind.ENUM,
+                    StructuralElementKind.PROTOCOL,
+                    StructuralElementKind.EXTENSION,
+                ):
+                    pending_container = name
+                i = j
+        i += 1
+
+    return tuple(elements)
 
 
 def _build_structure_visitor(visitor_base: type) -> type:
