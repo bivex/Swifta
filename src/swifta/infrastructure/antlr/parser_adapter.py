@@ -141,8 +141,8 @@ def _format_signature(tokens: list[str]) -> str:
     if not tokens:
         return ""
     result = []
-    no_space_before = {")", "]", "}", ",", ":", ";", ">", "?", "!"}
-    no_space_after = {"(", "[", "{", "<", "@"}
+    no_space_before = {")", "]", "}", ",", ":", ";", ">", "?", "!", "<", "."}
+    no_space_after = {"(", "[", "{", "<", "@", "."}
 
     for i, tok in enumerate(tokens):
         if i == 0:
@@ -162,6 +162,7 @@ def _format_signature(tokens: list[str]) -> str:
     out = "".join(result)
     out = re.sub(r"\s*-\s*>\s*", " -> ", out)
     out = re.sub(r"\s*:\s*", ": ", out)
+    out = re.sub(r"\[\s*:\s*\]", "[:]", out)
     return out.strip()
 
 
