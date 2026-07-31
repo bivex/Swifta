@@ -38,10 +38,14 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "parse-file":
-            report = _build_parse_service().parse_file(ParseFileCommand(path=args.path))
+            timeout = None if args.timeout <= 0 else args.timeout
+            report = _build_parse_service().parse_file(
+                ParseFileCommand(path=args.path, timeout=timeout)
+            )
         elif args.command == "parse-dir":
+            timeout = None if args.timeout <= 0 else args.timeout
             report = _build_parse_service().parse_directory(
-                ParseDirectoryCommand(root_path=args.path)
+                ParseDirectoryCommand(root_path=args.path, timeout=timeout)
             )
         elif args.command == "nassi-file":
             document = _build_nassi_service().build_file_diagram(
@@ -99,9 +103,21 @@ def _build_argument_parser() -> argparse.ArgumentParser:
 
     parse_file = subparsers.add_parser("parse-file", help="Parse one Swift file.")
     parse_file.add_argument("path", help="Path to a .swift file.")
+    parse_file.add_argument(
+        "--timeout",
+        type=float,
+        default=8.0,
+        help="Per-file parsing timeout in seconds (default: 8.0, set 0 to disable).",
+    )
 
     parse_dir = subparsers.add_parser("parse-dir", help="Parse all Swift files in a directory.")
     parse_dir.add_argument("path", help="Path to a directory.")
+    parse_dir.add_argument(
+        "--timeout",
+        type=float,
+        default=8.0,
+        help="Per-file parsing timeout in seconds (default: 8.0, set 0 to disable).",
+    )
 
     nassi_file = subparsers.add_parser(
         "nassi-file",

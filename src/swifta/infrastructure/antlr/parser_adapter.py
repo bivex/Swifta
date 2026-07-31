@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from time import perf_counter
 
+import signal
+import threading
+from typing import Any
+
 from swifta.domain.model import (
     GrammarVersion,
     ParseOutcome,
@@ -20,20 +24,62 @@ from swifta.infrastructure.antlr.runtime import (
 )
 
 
+class ParseTimeoutError(TimeoutError):
+    pass
+
+
+class _timeout_context:
+    def __init__(self, seconds: float | None) -> None:
+        self.seconds = seconds
+        self._old_handler: Any = None
+        self._armed: bool = False
+
+    def __enter__(self) -> None:
+        if (
+            self.seconds is not None
+            and self.seconds > 0
+            and hasattr(signal, "SIGALRM")
+            and hasattr(signal, "setitimer")
+            and threading.current_thread() is threading.main_thread()
+        ):
+            def _handler(signum: int, frame: Any) -> None:
+                raise ParseTimeoutError(f"parsing timeout exceeded ({self.seconds}s)")
+
+            self._old_handler = signal.signal(signal.SIGALRM, _handler)
+            signal.setitimer(signal.ITIMER_REAL, self.seconds)
+            self._armed = True
+
+    def __exit__(self, exc_type: type | None, exc_val: Exception | None, exc_tb: Any) -> None:
+        if self._armed:
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            if self._old_handler is not None:
+                signal.signal(signal.SIGALRM, self._old_handler)
+        return False
+
+
 class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
-    def __init__(self) -> None:
+    def __init__(self, default_timeout_seconds: float | None = 8.0) -> None:
         self._generated = load_generated_types()
+        self.default_timeout_seconds = default_timeout_seconds
 
     @property
     def grammar_version(self) -> GrammarVersion:
         return ANTLR_GRAMMAR_VERSION
 
-    def parse(self, source_unit: SourceUnit) -> ParseOutcome:
+    def parse(
+        self,
+        source_unit: SourceUnit,
+        timeout_seconds: float | None = None,
+    ) -> ParseOutcome:
+        effective_timeout = (
+            self.default_timeout_seconds if timeout_seconds is None else timeout_seconds
+        )
         started_at = perf_counter()
         try:
-            parse_result = parse_source_text(source_unit.content, self._generated)
-            structure_visitor = _build_structure_visitor(self._generated.visitor_type)()
-            structure_visitor.visit(parse_result.tree)
+            with _timeout_context(effective_timeout):
+                parse_result = parse_source_text(source_unit.content, self._generated)
+                structure_visitor = _build_structure_visitor(self._generated.visitor_type)()
+                structure_visitor.visit(parse_result.tree)
 
             elements = tuple(structure_visitor.elements)
             elapsed_ms = round((perf_counter() - started_at) * 1000, 3)

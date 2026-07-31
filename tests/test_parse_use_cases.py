@@ -106,3 +106,52 @@ def test_cli_outputs_json() -> None:
     assert result.returncode == 0
     payload = json.loads(result.stdout)
     assert payload["summary"]["source_count"] == 1
+
+
+def test_parse_file_times_out_gracefully(tmp_path: Path, monkeypatch) -> None:
+    import time
+    from swifta.domain.model import SourceUnit, SourceUnitId
+    from swifta.infrastructure.antlr import parser_adapter
+
+    parser = AntlrSwiftSyntaxParser(default_timeout_seconds=0.05)
+    source_unit = SourceUnit(
+        identifier=SourceUnitId("slow.swift"),
+        location=str(tmp_path / "slow.swift"),
+        content="struct Slow { }",
+    )
+
+    # Mock parse_source_text to simulate a hanging parser execution
+    def _mock_slow_parse(*args, **kwargs):
+        time.sleep(0.2)
+        raise RuntimeError("Should have timed out")
+
+    monkeypatch.setattr(parser_adapter, "parse_source_text", _mock_slow_parse)
+
+    outcome = parser.parse(source_unit, timeout_seconds=0.05)
+    assert outcome.status.value == "technical_failure"
+    assert outcome.failure_message is not None
+    assert "timeout" in outcome.failure_message.lower()
+
+
+def test_cli_supports_timeout_flag() -> None:
+    _ensure_generated_parser()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "swifta.presentation.cli.main",
+            "parse-file",
+            "--timeout",
+            "5.0",
+            str(ROOT / "tests" / "fixtures" / "valid.swift"),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["summary"]["source_count"] == 1
+

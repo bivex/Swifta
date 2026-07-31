@@ -42,13 +42,17 @@ class ParsingJobService:
 
     def parse_file(self, command: ParseFileCommand) -> ParsingJobReportDTO:
         source_unit = self.source_repository.load_file(command.path)
-        return self._run_job((source_unit,))
+        return self._run_job((source_unit,), timeout=command.timeout)
 
     def parse_directory(self, command: ParseDirectoryCommand) -> ParsingJobReportDTO:
         source_units = tuple(self.source_repository.list_swift_sources(command.root_path))
-        return self._run_job(source_units)
+        return self._run_job(source_units, timeout=command.timeout)
 
-    def _run_job(self, source_units: tuple[SourceUnit, ...]) -> ParsingJobReportDTO:
+    def _run_job(
+        self,
+        source_units: tuple[SourceUnit, ...],
+        timeout: float | None = None,
+    ) -> ParsingJobReportDTO:
         created_at = self.clock.now()
         job = ParsingJob(
             job_id=f"parse-{uuid4()}",
@@ -64,7 +68,7 @@ class ParsingJobService:
         )
 
         for source_unit in source_units:
-            outcome = self.parser.parse(source_unit)
+            outcome = self.parser.parse(source_unit, timeout_seconds=timeout)
             job.record_outcome(outcome)
             self._publish_source_event(job.job_id, outcome)
 

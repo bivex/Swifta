@@ -11,11 +11,13 @@ REPORT_SCHEMA_VERSION = "1.0.0"
 @dataclass(frozen=True, slots=True)
 class ParseFileCommand:
     path: str
+    timeout: float | None = 8.0
 
 
 @dataclass(frozen=True, slots=True)
 class ParseDirectoryCommand:
     root_path: str
+    timeout: float | None = 8.0
 
 
 @dataclass(frozen=True, slots=True)

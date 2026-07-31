@@ -34,7 +34,11 @@ class SwiftSyntaxParser(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def parse(self, source_unit: SourceUnit) -> ParseOutcome:
+    def parse(
+        self,
+        source_unit: SourceUnit,
+        timeout_seconds: float | None = None,
+    ) -> ParseOutcome:
         raise NotImplementedError
 
 
