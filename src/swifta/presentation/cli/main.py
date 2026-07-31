@@ -109,8 +109,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parse_file.add_argument(
         "--timeout",
         type=float,
-        default=1.5,
-        help="Per-file parsing timeout in seconds (default: 1.5, set 0 to disable).",
+        default=8.0,
+        help="Per-file parsing timeout in seconds (default: 8.0, set 0 to disable).",
     )
 
     parse_dir = subparsers.add_parser("parse-dir", help="Parse all Swift files in a directory.")
@@ -118,8 +118,8 @@ def _build_argument_parser() -> argparse.ArgumentParser:
     parse_dir.add_argument(
         "--timeout",
         type=float,
-        default=1.5,
-        help="Per-file parsing timeout in seconds (default: 1.5, set 0 to disable).",
+        default=8.0,
+        help="Per-file parsing timeout in seconds (default: 8.0, set 0 to disable).",
     )
 
     nassi_file = subparsers.add_parser(

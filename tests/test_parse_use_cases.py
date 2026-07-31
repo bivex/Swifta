@@ -117,7 +117,13 @@ def test_parse_file_times_out_gracefully(tmp_path: Path, monkeypatch) -> None:
     source_unit = SourceUnit(
         identifier=SourceUnitId("slow.swift"),
         location=str(tmp_path / "slow.swift"),
-        content="struct Slow { }",
+        content="""
+actor Manager {
+    init() {}
+    deinit {}
+    subscript(i: Int) -> String { "a" }
+}
+""".strip(),
     )
 
     # Mock parse_source_text to simulate a hanging parser execution
@@ -129,8 +135,10 @@ def test_parse_file_times_out_gracefully(tmp_path: Path, monkeypatch) -> None:
 
     outcome = parser.parse(source_unit, timeout_seconds=0.05)
     assert outcome.status.value == "succeeded_with_diagnostics"
-    assert len(outcome.structural_elements) == 1
-    assert outcome.structural_elements[0].name == "Slow"
+    assert len(outcome.structural_elements) == 4
+    names = [e.name for e in outcome.structural_elements]
+    assert names == ["Manager", "init", "deinit", "subscript"]
+    assert outcome.statistics.token_count > 0
     assert "lightweight" in outcome.diagnostics[0].message.lower()
 
 

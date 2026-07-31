@@ -61,7 +61,7 @@ class _timeout_context:
 
 
 class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
-    def __init__(self, default_timeout_seconds: float | None = 1.5) -> None:
+    def __init__(self, default_timeout_seconds: float | None = 8.0) -> None:
         self._generated = load_generated_types()
         self.default_timeout_seconds = default_timeout_seconds
 
@@ -102,7 +102,9 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
         except Exception:
             # Fallback to lightweight token scanner when ANTLR AST parse fails or times out
             try:
-                fallback_elements = _scan_lightweight_structure(source_unit.content, self._generated)
+                fallback_elements, token_count = _scan_lightweight_structure(
+                    source_unit.content, self._generated
+                )
                 elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
                 diagnostics = (
                     SyntaxDiagnostic(
@@ -118,7 +120,7 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                     diagnostics=diagnostics,
                     structural_elements=fallback_elements,
                     statistics=ParseStatistics(
-                        token_count=0,
+                        token_count=token_count,
                         structural_element_count=len(fallback_elements),
                         diagnostic_count=1,
                         elapsed_ms=elapsed_ms,
@@ -137,13 +139,15 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
 def _scan_lightweight_structure(
     content: str,
     generated_types: GeneratedParserTypes,
-) -> tuple[StructuralElement, ...]:
+) -> tuple[tuple[StructuralElement, ...], int]:
     from antlr4 import CommonTokenStream, InputStream
 
     lexer = generated_types.lexer_type(InputStream(content))
     token_stream = CommonTokenStream(lexer)
     token_stream.fill()
-    tokens = [t for t in token_stream.tokens if t.type != -1 and t.text.strip()]
+    raw_tokens = token_stream.tokens
+    token_count = len(raw_tokens)
+    tokens = [t for t in raw_tokens if t.type != -1 and t.text.strip()]
 
     elements: list[StructuralElement] = []
     containers: list[str] = []
@@ -173,6 +177,7 @@ def _scan_lightweight_structure(
             continue
 
         kind = None
+        is_special_func = False
         if txt == "import":
             kind = StructuralElementKind.IMPORT
         elif txt == "typealias":
@@ -189,37 +194,26 @@ def _scan_lightweight_structure(
             kind = StructuralElementKind.EXTENSION
         elif txt == "func":
             kind = StructuralElementKind.FUNCTION
+        elif txt in ("init", "deinit", "subscript"):
+            kind = StructuralElementKind.FUNCTION
+            is_special_func = True
         elif txt == "var":
             kind = StructuralElementKind.VARIABLE
         elif txt == "let":
             kind = StructuralElementKind.CONSTANT
 
         if kind is not None:
-            j = i + 1
-            while j < n and (
-                tokens[j].text.startswith("@")
-                or tokens[j].text in (
-                    "public", "private", "fileprivate", "internal", "open",
-                    "final", "static", "override", "mutating", "nonmutating",
-                    "async", "optional", "required", "lazy", "indirect",
-                )
-            ):
-                j += 1
-            if j < n and tokens[j].text not in ("{", "}", ";", "("):
-                name = tokens[j].text
+            if is_special_func:
+                name = txt
                 line = t.line
                 column = t.column
                 container = ".".join(containers) if containers else None
-
-                sig = f"{kind.value} {name}"
-                if kind == StructuralElementKind.FUNCTION:
-                    sig_tokens = []
-                    k = j
-                    while k < n and tokens[k].text not in ("{", ";"):
-                        sig_tokens.append(tokens[k].text)
-                        k += 1
-                    sig = "func " + " ".join(sig_tokens)
-
+                sig_tokens = [txt]
+                k = i + 1
+                while k < n and tokens[k].text not in ("{", ";"):
+                    sig_tokens.append(tokens[k].text)
+                    k += 1
+                sig = " ".join(sig_tokens)
                 elements.append(
                     StructuralElement(
                         kind=kind,
@@ -230,19 +224,56 @@ def _scan_lightweight_structure(
                         signature=sig,
                     )
                 )
-
-                if kind in (
-                    StructuralElementKind.STRUCT,
-                    StructuralElementKind.CLASS,
-                    StructuralElementKind.ENUM,
-                    StructuralElementKind.PROTOCOL,
-                    StructuralElementKind.EXTENSION,
+            else:
+                j = i + 1
+                while j < n and (
+                    tokens[j].text.startswith("@")
+                    or tokens[j].text in (
+                        "public", "private", "fileprivate", "internal", "open",
+                        "final", "static", "override", "mutating", "nonmutating",
+                        "async", "optional", "required", "lazy", "indirect",
+                    )
                 ):
-                    pending_container = name
-                i = j
+                    j += 1
+                if j < n and tokens[j].text not in ("{", "}", ";", "("):
+                    name = tokens[j].text
+                    line = t.line
+                    column = t.column
+                    container = ".".join(containers) if containers else None
+
+                    prefix = "actor" if txt == "actor" else kind.value
+                    sig = f"{prefix} {name}"
+                    if kind == StructuralElementKind.FUNCTION:
+                        sig_tokens = []
+                        k = j
+                        while k < n and tokens[k].text not in ("{", ";"):
+                            sig_tokens.append(tokens[k].text)
+                            k += 1
+                        sig = "func " + " ".join(sig_tokens)
+
+                    elements.append(
+                        StructuralElement(
+                            kind=kind,
+                            name=name,
+                            line=line,
+                            column=column,
+                            container=container,
+                            signature=sig,
+                        )
+                    )
+
+                    if kind in (
+                        StructuralElementKind.STRUCT,
+                        StructuralElementKind.CLASS,
+                        StructuralElementKind.ENUM,
+                        StructuralElementKind.PROTOCOL,
+                        StructuralElementKind.EXTENSION,
+                    ):
+                        pending_container = name
+                    i = j
         i += 1
 
-    return tuple(elements)
+    return tuple(elements), token_count
 
 
 def _build_structure_visitor(visitor_base: type) -> type:
