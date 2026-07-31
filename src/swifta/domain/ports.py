@@ -44,7 +44,11 @@ class SwiftSyntaxParser(ABC):
 
 class SwiftControlFlowExtractor(ABC):
     @abstractmethod
-    def extract(self, source_unit: SourceUnit) -> ControlFlowDiagram:
+    def extract(
+        self,
+        source_unit: SourceUnit,
+        timeout_seconds: float | None = None,
+    ) -> ControlFlowDiagram:
         raise NotImplementedError
 
 

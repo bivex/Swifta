@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 
 from antlr4 import CommonTokenStream, InputStream
@@ -26,6 +27,7 @@ from swifta.domain.control_flow import (
 )
 from swifta.domain.model import SourceUnit
 from swifta.domain.ports import SwiftControlFlowExtractor
+from swifta.infrastructure.antlr.parser_adapter import _timeout_context
 from swifta.infrastructure.antlr.runtime import (
     load_generated_types,
     parse_code_block_text,
@@ -78,25 +80,44 @@ _MAX_STRUCTURED_PARSE_LINES = 24
 _MAX_EXPANDED_CLOSURE_CHARS = 1800
 _MAX_EXPANDED_CLOSURE_LINES = 36
 _SUMMARY_LABEL_LIMIT = 96
+MAX_RECURSION_DEPTH = 30
 
 
 class AntlrSwiftControlFlowExtractor(SwiftControlFlowExtractor):
-    def __init__(self) -> None:
+    def __init__(self, default_timeout_seconds: float | None = 8.0) -> None:
         self._generated = load_generated_types()
         self._lexer_type = self._generated.lexer_type
+        self.default_timeout_seconds = default_timeout_seconds
 
-    def extract(self, source_unit: SourceUnit) -> ControlFlowDiagram:
+    def extract(
+        self,
+        source_unit: SourceUnit,
+        timeout_seconds: float | None = None,
+    ) -> ControlFlowDiagram:
+        sys.setrecursionlimit(max(sys.getrecursionlimit(), MAX_RECURSION_DEPTH + 100))
+        effective_timeout = (
+            self.default_timeout_seconds if timeout_seconds is None else timeout_seconds
+        )
         try:
-            function_slices = _scan_function_slices(source_unit.content, self._generated)
-            functions = tuple(self._extract_function_slice(function_slice) for function_slice in function_slices)
-            return ControlFlowDiagram(
-                source_location=source_unit.location,
-                functions=functions,
-            )
-        except Exception:
-            # Fallback to the slower whole-file parser when the lightweight scanner
-            # cannot safely isolate function bodies.
-            return self._extract_via_full_parse(source_unit)
+            with _timeout_context(effective_timeout):
+                function_slices = _scan_function_slices(source_unit.content, self._generated)
+                functions = tuple(
+                    self._extract_function_slice(function_slice)
+                    for function_slice in function_slices
+                )
+                return ControlFlowDiagram(
+                    source_location=source_unit.location,
+                    functions=functions,
+                )
+        except (RecursionError, TimeoutError, Exception):
+            try:
+                with _timeout_context(effective_timeout):
+                    return self._extract_via_full_parse(source_unit)
+            except (RecursionError, TimeoutError, Exception):
+                return ControlFlowDiagram(
+                    source_location=source_unit.location,
+                    functions=(),
+                )
 
     def _extract_function_slice(self, function_slice: _FunctionSlice) -> FunctionControlFlow:
         quick_steps = _extract_lightweight_steps(
@@ -347,7 +368,12 @@ def _extract_lightweight_steps(
     generated: object,
     visitor_type: type,
     lexer_type: object,
+    *,
+    depth: int = 0,
 ) -> tuple[ControlFlowStep, ...] | None:
+    if depth > MAX_RECURSION_DEPTH:
+        return ()
+
     statement_spans = _split_top_level_statement_spans(body_text, lexer_type)
     if statement_spans is None:
         return None
@@ -374,6 +400,7 @@ def _extract_lightweight_steps(
                 generated,
                 visitor_type,
                 lexer_type,
+                depth=depth + 1,
             )
             if nested_steps is None:
                 parse_result = parse_code_block_text(closure_body, generated)
@@ -400,6 +427,7 @@ def _extract_lightweight_steps(
                 generated,
                 visitor_type,
                 lexer_type,
+                depth=depth + 1,
             )
             if nested_steps is None:
                 parse_result = parse_code_block_text(trailing_body, generated)

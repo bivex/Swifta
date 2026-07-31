@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from swifta.domain.control_flow import ControlFlowDiagram
 from swifta.domain.ports import NassiDiagramRenderer, SourceRepository, SwiftControlFlowExtractor
 
 
@@ -67,7 +68,14 @@ class NassiDiagramService:
         )
 
     def _build_document(self, source_unit) -> NassiDiagramDocumentDTO:
-        diagram = self.extractor.extract(source_unit)
+        try:
+            diagram = self.extractor.extract(source_unit)
+        except Exception:
+            diagram = ControlFlowDiagram(
+                source_location=source_unit.location,
+                functions=(),
+            )
+
         return NassiDiagramDocumentDTO(
             source_location=diagram.source_location,
             function_count=len(diagram.functions),

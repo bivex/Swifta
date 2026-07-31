@@ -88,8 +88,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         else:
             parser.error(f"unsupported command: {args.command}")
-    except SwiftaError as error:
+    except (SwiftaError, OSError) as error:
         print(json.dumps({"error": str(error)}, indent=2), file=sys.stderr)
+        return 2
+    except Exception as error:
+        print(json.dumps({"error": f"unexpected error: {error}"}, indent=2), file=sys.stderr)
         return 2
 
     print(json.dumps(report.to_dict(), indent=2))

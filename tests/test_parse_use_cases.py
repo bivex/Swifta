@@ -155,3 +155,68 @@ def test_cli_supports_timeout_flag() -> None:
     payload = json.loads(result.stdout)
     assert payload["summary"]["source_count"] == 1
 
+
+def test_symlink_directory_loops_and_escaping_are_ignored(tmp_path: Path) -> None:
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    valid_file = repo_dir / "valid.swift"
+    valid_file.write_text("struct Valid {}", encoding="utf-8")
+
+    # Directory symlink loop
+    loop_symlink = repo_dir / "loop_link"
+    loop_symlink.symlink_to(repo_dir, target_is_directory=True)
+
+    # Outside file symlink
+    outside_file = tmp_path / "outside.swift"
+    outside_file.write_text("struct Outside {}", encoding="utf-8")
+    outside_link = repo_dir / "outside_link.swift"
+    outside_link.symlink_to(outside_file)
+
+    repo = FileSystemSourceRepository()
+    sources = repo.list_swift_sources(str(repo_dir))
+
+    assert len(sources) == 1
+    assert sources[0].location == str(valid_file.resolve())
+
+
+def test_nassi_extractor_handles_deep_recursion_without_crashing(tmp_path: Path) -> None:
+    from swifta.application.control_flow import BuildNassiDiagramCommand, NassiDiagramService
+    from swifta.infrastructure.antlr.control_flow_extractor import AntlrSwiftControlFlowExtractor
+    from swifta.infrastructure.rendering.nassi_html_renderer import HtmlNassiDiagramRenderer
+
+    # Generate deeply nested code
+    nested_code = "func deep() {\n" + "autoreleasepool {\n" * 50 + "print(1)\n" + "}\n" * 50 + "}\n"
+    file_path = tmp_path / "deep.swift"
+    file_path.write_text(nested_code, encoding="utf-8")
+
+    service = NassiDiagramService(
+        source_repository=FileSystemSourceRepository(),
+        extractor=AntlrSwiftControlFlowExtractor(),
+        renderer=HtmlNassiDiagramRenderer(),
+    )
+    document = service.build_file_diagram(BuildNassiDiagramCommand(path=str(file_path)))
+    assert document.source_location == str(file_path.resolve())
+
+
+def test_cli_handles_os_error_without_traceback(tmp_path: Path) -> None:
+    non_existent = tmp_path / "does_not_exist.swift"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "swifta.presentation.cli.main",
+            "parse-file",
+            str(non_existent),
+        ],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    payload = json.loads(result.stderr)
+    assert "error" in payload
+    assert "Traceback" not in result.stderr
+
+

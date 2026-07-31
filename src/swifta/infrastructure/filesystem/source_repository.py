@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from swifta.domain.errors import InputValidationError, SourceAccessError
 from swifta.domain.model import SourceUnit, SourceUnitId
 from swifta.domain.ports import SourceRepository
-
 
 class FileSystemSourceRepository(SourceRepository):
     def load_file(self, path: str) -> SourceUnit:
@@ -28,7 +28,28 @@ class FileSystemSourceRepository(SourceRepository):
         if not root.is_dir():
             raise InputValidationError(f"path is not a directory: {root}")
 
-        source_paths = tuple(sorted(path for path in root.rglob("*.swift") if path.is_file()))
+        source_paths: list[Path] = []
+        seen_resolved: set[Path] = set()
+
+        for dirpath, _dirnames, filenames in os.walk(root, followlinks=False):
+            for filename in filenames:
+                if filename.endswith(".swift"):
+                    file_path = Path(dirpath) / filename
+                    if file_path.is_symlink():
+                        try:
+                            resolved = file_path.resolve(strict=True)
+                        except (OSError, RuntimeError):
+                            continue
+                        if not resolved.is_file() or not resolved.is_relative_to(root):
+                            continue
+                    else:
+                        resolved = file_path.resolve()
+
+                    if resolved not in seen_resolved:
+                        seen_resolved.add(resolved)
+                        source_paths.append(file_path)
+
+        source_paths.sort()
         if not source_paths:
             raise InputValidationError(f"no .swift files found under: {root}")
 
