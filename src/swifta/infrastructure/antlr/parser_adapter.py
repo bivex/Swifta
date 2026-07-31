@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from time import perf_counter
 
+import re
 import signal
 import threading
 from typing import Any
@@ -136,6 +137,34 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                 )
 
 
+def _format_signature(tokens: list[str]) -> str:
+    if not tokens:
+        return ""
+    result = []
+    no_space_before = {")", "]", "}", ",", ":", ";", ">", "?", "!"}
+    no_space_after = {"(", "[", "{", "<", "@"}
+
+    for i, tok in enumerate(tokens):
+        if i == 0:
+            result.append(tok)
+            continue
+        prev = tokens[i - 1]
+
+        if tok == "(" and prev not in (
+            "func", "inout", "throws", "async", "rethrows", "->", "=", "return", "where"
+        ):
+            result.append(tok)
+        elif tok in no_space_before or prev in no_space_after:
+            result.append(tok)
+        else:
+            result.append(" " + tok)
+
+    out = "".join(result)
+    out = re.sub(r"\s*-\s*>\s*", " -> ", out)
+    out = re.sub(r"\s*:\s*", ": ", out)
+    return out.strip()
+
+
 def _scan_lightweight_structure(
     content: str,
     generated_types: GeneratedParserTypes,
@@ -210,10 +239,10 @@ def _scan_lightweight_structure(
                 container = ".".join(containers) if containers else None
                 sig_tokens = [txt]
                 k = i + 1
-                while k < n and tokens[k].text not in ("{", ";"):
+                while k < n and tokens[k].text not in ("{", "}", ";"):
                     sig_tokens.append(tokens[k].text)
                     k += 1
-                sig = " ".join(sig_tokens)
+                sig = _format_signature(sig_tokens)
                 elements.append(
                     StructuralElement(
                         kind=kind,
@@ -246,10 +275,10 @@ def _scan_lightweight_structure(
                     if kind == StructuralElementKind.FUNCTION:
                         sig_tokens = []
                         k = j
-                        while k < n and tokens[k].text not in ("{", ";"):
+                        while k < n and tokens[k].text not in ("{", "}", ";"):
                             sig_tokens.append(tokens[k].text)
                             k += 1
-                        sig = "func " + " ".join(sig_tokens)
+                        sig = "func " + _format_signature(sig_tokens)
 
                     elements.append(
                         StructuralElement(

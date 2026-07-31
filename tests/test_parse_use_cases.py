@@ -138,8 +138,38 @@ actor Manager {
     assert len(outcome.structural_elements) == 4
     names = [e.name for e in outcome.structural_elements]
     assert names == ["Manager", "init", "deinit", "subscript"]
+    assert outcome.structural_elements[1].signature == "init()"
+    assert outcome.structural_elements[3].signature == "subscript(i: Int) -> String"
     assert outcome.statistics.token_count > 0
     assert "lightweight" in outcome.diagnostics[0].message.lower()
+
+
+def test_signature_collection_does_not_runaway_on_closing_brace(tmp_path: Path, monkeypatch) -> None:
+    from swifta.domain.model import SourceUnit, SourceUnitId
+    from swifta.infrastructure.antlr import parser_adapter
+
+    parser = AntlrSwiftSyntaxParser(default_timeout_seconds=0.05)
+    source_unit = SourceUnit(
+        identifier=SourceUnitId("runaway.swift"),
+        location=str(tmp_path / "runaway.swift"),
+        content="""
+struct Model {
+    init?(rawValue: String) }
+    var focusedPanel: String?
+    let tour = "test"
+}
+""".strip(),
+    )
+
+    def _mock_slow_parse(*args, **kwargs):
+        raise RuntimeError("Force fallback")
+
+    monkeypatch.setattr(parser_adapter, "parse_source_text", _mock_slow_parse)
+
+    outcome = parser.parse(source_unit, timeout_seconds=0.05)
+    init_elem = next(e for e in outcome.structural_elements if e.name == "init")
+    assert init_elem.signature == "init?(rawValue: String)"
+    assert "focusedPanel" not in init_elem.signature
 
 
 def test_cli_supports_timeout_flag() -> None:
