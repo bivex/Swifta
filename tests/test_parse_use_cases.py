@@ -207,7 +207,44 @@ struct Impl: Service {
 
     assert names == ["Service", "fetch", "Impl", "storage", "computed"]
     assert containers == [None, "Service", None, "Impl", "Impl"]
-    assert "localVal" not in names
+def test_members_after_func_or_computed_property_are_extracted(tmp_path: Path, monkeypatch) -> None:
+    from swifta.domain.model import SourceUnit, SourceUnitId
+    from swifta.infrastructure.antlr import parser_adapter
+
+    parser = AntlrSwiftSyntaxParser(default_timeout_seconds=0.05)
+    source_unit = SourceUnit(
+        identifier=SourceUnitId("mixed.swift"),
+        location=str(tmp_path / "mixed.swift"),
+        content="""
+struct Model {
+    let first: Int
+    func process() {
+        var localInProcess = 1
+    }
+    let afterFunc: String
+    var computed: Int {
+        var localInComputed = 2
+        return localInComputed
+    }
+    var afterComputed: Double
+}
+""".strip(),
+    )
+
+    def _mock_slow_parse(*args, **kwargs):
+        raise RuntimeError("Force fallback")
+
+    monkeypatch.setattr(parser_adapter, "parse_source_text", _mock_slow_parse)
+
+    outcome = parser.parse(source_unit, timeout_seconds=0.05)
+    elements = outcome.structural_elements
+    names = [e.name for e in elements]
+    containers = [e.container for e in elements]
+
+    assert names == ["Model", "first", "process", "afterFunc", "computed", "afterComputed"]
+    assert containers == [None, "Model", "Model", "Model", "Model", "Model"]
+    assert "localInProcess" not in names
+    assert "localInComputed" not in names
 
 
 def test_cli_supports_timeout_flag() -> None:

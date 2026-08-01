@@ -196,6 +196,7 @@ def _scan_lightweight_structure(
 
         if txt == "{":
             parent_type_depth = len(type_containers)
+            snapshot_func_depth = func_depth
             if pending_type_container is not None:
                 type_containers.append(pending_type_container)
                 pending_type_container = None
@@ -206,7 +207,7 @@ def _scan_lightweight_structure(
             elif func_depth > 0:
                 func_depth += 1
 
-            brace_depths.append((parent_type_depth, func_depth))
+            brace_depths.append((parent_type_depth, snapshot_func_depth))
             i += 1
             continue
         elif txt == "}":
