@@ -62,7 +62,7 @@ class _timeout_context:
 
 
 class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
-    def __init__(self, default_timeout_seconds: float | None = 8.0) -> None:
+    def __init__(self, default_timeout_seconds: float | None = 0.1) -> None:
         self._generated = load_generated_types()
         self.default_timeout_seconds = default_timeout_seconds
 
