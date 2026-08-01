@@ -28,6 +28,9 @@ from swifta.infrastructure.antlr.runtime import (
 )
 
 
+from collections import Counter
+
+
 class ParseTimeoutError(TimeoutError):
     pass
 
@@ -86,17 +89,19 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                 structure_visitor.visit(parse_result.tree)
 
             elements = tuple(structure_visitor.elements)
+            smell_diagnostics = detect_code_smells(source_unit.content, elements)
+            all_diagnostics = parse_result.diagnostics + smell_diagnostics
             elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
 
             return ParseOutcome.success(
                 source_unit=source_unit,
                 grammar_version=self.grammar_version,
-                diagnostics=parse_result.diagnostics,
+                diagnostics=all_diagnostics,
                 structural_elements=elements,
                 statistics=ParseStatistics(
                     token_count=len(parse_result.token_stream.tokens),
                     structural_element_count=len(elements),
-                    diagnostic_count=len(parse_result.diagnostics),
+                    diagnostic_count=len(all_diagnostics),
                     elapsed_ms=elapsed_ms,
                 ),
             )
@@ -107,7 +112,7 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                     source_unit.content, self._generated
                 )
                 elapsed_ms = round((perf_counter() - started_at) * 1000, 3)
-                diagnostics = (
+                fallback_diagnostics = (
                     SyntaxDiagnostic(
                         severity=DiagnosticSeverity.WARNING,
                         message="parsed via lightweight declaration scanner fallback",
@@ -115,15 +120,19 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                         column=0,
                     ),
                 )
+                smell_diagnostics = detect_code_smells(
+                    source_unit.content, fallback_elements
+                )
+                all_diagnostics = fallback_diagnostics + smell_diagnostics
                 return ParseOutcome.success(
                     source_unit=source_unit,
                     grammar_version=self.grammar_version,
-                    diagnostics=diagnostics,
+                    diagnostics=all_diagnostics,
                     structural_elements=fallback_elements,
                     statistics=ParseStatistics(
                         token_count=token_count,
                         structural_element_count=len(fallback_elements),
-                        diagnostic_count=1,
+                        diagnostic_count=len(all_diagnostics),
                         elapsed_ms=elapsed_ms,
                     ),
                 )
@@ -135,6 +144,96 @@ class AntlrSwiftSyntaxParser(SwiftSyntaxParser):
                     message=str(fallback_error),
                     elapsed_ms=elapsed_ms,
                 )
+
+
+def detect_code_smells(
+    content: str,
+    structural_elements: tuple[StructuralElement, ...],
+) -> tuple[SyntaxDiagnostic, ...]:
+    smells: list[SyntaxDiagnostic] = []
+
+    lines = content.splitlines()
+    if len(lines) > 500:
+        smells.append(
+            SyntaxDiagnostic(
+                severity=DiagnosticSeverity.WARNING,
+                message=f"Smell (large-file): file contains {len(lines)} lines of code (threshold: 500)",
+                line=1,
+                column=0,
+            )
+        )
+
+    container_funcs: Counter[str] = Counter()
+    container_elems: Counter[str] = Counter()
+    container_declarations: dict[str, StructuralElement] = {}
+
+    for elem in structural_elements:
+        if elem.kind in (
+            StructuralElementKind.STRUCT,
+            StructuralElementKind.CLASS,
+            StructuralElementKind.ENUM,
+            StructuralElementKind.PROTOCOL,
+        ):
+            container_declarations[elem.name] = elem
+
+        if elem.container:
+            top_container = elem.container.split(".")[0]
+            container_elems[top_container] += 1
+            if elem.kind == StructuralElementKind.FUNCTION:
+                container_funcs[top_container] += 1
+
+        if elem.kind == StructuralElementKind.FUNCTION and elem.signature:
+            if "(" in elem.signature and ")" in elem.signature:
+                param_str = elem.signature[
+                    elem.signature.find("(") + 1 : elem.signature.rfind(")")
+                ]
+                if param_str.strip():
+                    depth = 0
+                    comma_count = 0
+                    for ch in param_str:
+                        if ch in ("<", "(", "["):
+                            depth += 1
+                        elif ch in (">", ")", "]"):
+                            depth -= 1
+                        elif ch == "," and depth == 0:
+                            comma_count += 1
+                    param_count = comma_count + 1
+                    if param_count >= 5:
+                        smells.append(
+                            SyntaxDiagnostic(
+                                severity=DiagnosticSeverity.WARNING,
+                                message=f"Smell (too-many-parameters): function '{elem.name}' has {param_count} parameters (threshold: 5)",
+                                line=elem.line,
+                                column=elem.column,
+                            )
+                        )
+
+        if elem.container and elem.container.count(".") >= 2:
+            smells.append(
+                SyntaxDiagnostic(
+                    severity=DiagnosticSeverity.WARNING,
+                    message=f"Smell (deep-container-nesting): '{elem.name}' is nested {elem.container.count('.') + 1} levels deep inside '{elem.container}'",
+                    line=elem.line,
+                    column=elem.column,
+                )
+            )
+
+    for name, total_count in container_elems.items():
+        funcs = container_funcs[name]
+        if funcs >= 20 or total_count >= 30:
+            decl = container_declarations.get(name)
+            line = decl.line if decl else 1
+            col = decl.column if decl else 0
+            smells.append(
+                SyntaxDiagnostic(
+                    severity=DiagnosticSeverity.WARNING,
+                    message=f"Smell (massive-container): '{name}' contains {funcs} functions and {total_count} members (God Object suspect)",
+                    line=line,
+                    column=col,
+                )
+            )
+
+    return tuple(smells)
 
 
 def _format_signature(tokens: list[str]) -> str:
